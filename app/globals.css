@@ -1,0 +1,1094 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #ffffff;
+  --foreground: #4b5563;
+  --card: #fffbeb;
+  --card-foreground: #4b5563;
+  --popover: #ffffff;
+  --popover-foreground: #4b5563;
+  --primary: #ea580c;
+  --primary-foreground: #ffffff;
+  --secondary: #f97316;
+  --secondary-foreground: #ffffff;
+  --muted: #f9fafb;
+  --muted-foreground: #4b5563;
+  --accent: #fffbeb;
+  --accent-foreground: #4b5563;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #e5e7eb;
+  --input: #ffffff;
+  --ring: rgba(234, 88, 12, 0.5);
+  --chart-1: #059669;
+  --chart-2: #0891b2;
+  --chart-3: #ea580c;
+  --chart-4: #f97316;
+  --chart-5: #dc2626;
+  --radius: 0.5rem;
+  --sidebar: #fffbeb;
+  --sidebar-foreground: #4b5563;
+  --sidebar-primary: #ea580c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f97316;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: rgba(234, 88, 12, 0.5);
+}
+
+.dark {
+  --background: #1a1a1a;
+  --foreground: #ffffff;
+  --card: #2a2a2a;
+  --card-foreground: #ffffff;
+  --popover: #1a1a1a;
+  --popover-foreground: #ffffff;
+  --primary: #ea580c;
+  --primary-foreground: #ffffff;
+  --secondary: #f97316;
+  --secondary-foreground: #ffffff;
+  --muted: #2a2a2a;
+  --muted-foreground: #a1a1aa;
+  --accent: #2a2a2a;
+  --accent-foreground: #ffffff;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #3a3a3a;
+  --input: #2a2a2a;
+  --ring: rgba(234, 88, 12, 0.5);
+  --chart-1: #10b981;
+  --chart-2: #06b6d4;
+  --chart-3: #ea580c;
+  --chart-4: #f97316;
+  --chart-5: #dc2626;
+  --sidebar: #2a2a2a;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ea580c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f97316;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #3a3a3a;
+  --sidebar-ring: rgba(234, 88, 12, 0.5);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --font-sans: var(--font-dm-sans);
+  --font-serif: var(--font-space-grotesk);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans transition-colors duration-300;
+  }
+}
+
+/* Casino-specific dark mode adjustments */
+.dark .casino-gradient {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d1b69 25%, #1e3a8a 50%, #2d1b69 75%, #1a1a1a 100%);
+  background-size: 400% 400%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+.dark .casino-card-gradient {
+  background: linear-gradient(145deg, #2a2a2a 0%, #3a3a3a 50%, #4a4a4a 100%);
+}
+
+.dark .casino-glow {
+  animation: casino-glow-dark 2s ease-in-out infinite;
+}
+
+@keyframes casino-glow-dark {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(234, 88, 12, 0.2), 0 0 40px rgba(234, 88, 12, 0.05);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(234, 88, 12, 0.4), 0 0 60px rgba(234, 88, 12, 0.1);
+  }
+}
+
+
+
+/* Casino-specific animations */
+@keyframes casino-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(234, 88, 12, 0.3), 0 0 40px rgba(234, 88, 12, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(234, 88, 12, 0.6), 0 0 60px rgba(234, 88, 12, 0.2);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  33% {
+    transform: translateY(-15px) rotate(5deg);
+  }
+  66% {
+    transform: translateY(-5px) rotate(-3deg);
+  }
+}
+
+@keyframes pulse-border {
+  0%,
+  100% {
+    border-color: rgba(234, 88, 12, 0.3);
+  }
+  50% {
+    border-color: rgba(234, 88, 12, 0.8);
+  }
+}
+
+@keyframes sparkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes gradient-shift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.casino-glow {
+  animation: casino-glow 2s ease-in-out infinite;
+}
+
+.float-animation {
+  animation: float 4s ease-in-out infinite;
+}
+
+.pulse-border {
+  animation: pulse-border 2s ease-in-out infinite;
+}
+
+.sparkle {
+  animation: sparkle 1.5s ease-in-out infinite;
+}
+
+.casino-gradient {
+  background: linear-gradient(135deg, #fffbeb 0%, #fed7aa 25%, #fdba74 50%, #fed7aa 75%, #fffbeb 100%);
+  background-size: 400% 400%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+.casino-card-gradient {
+  background: linear-gradient(145deg, #ffffff 0%, #fffbeb 50%, #fed7aa 100%);
+}
+
+.hover-lift {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 20px 40px rgba(234, 88, 12, 0.2);
+}
+/* Mobile-First Responsive Design System */
+/* Base mobile styles (320px+) */
+:root {
+  --mobile-padding: 0.75rem;
+  --tablet-padding: 1rem;
+  --desktop-padding: 1.5rem;
+  --mobile-gap: 0.5rem;
+  --tablet-gap: 0.75rem;
+  --desktop-gap: 1rem;
+}
+
+/* Mobile-first base styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  overflow-x: auto;
+}
+
+/* Container responsive system */
+.container {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding-left: var(--mobile-padding);
+  padding-right: var(--mobile-padding);
+}
+
+/* Mobile Navigation Overlay */
+.mobile-nav-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(10px);
+  z-index: 50;
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Responsive Grid System */
+.grid-responsive {
+  display: grid;
+  gap: var(--mobile-gap);
+  grid-template-columns: 1fr;
+}
+
+/* Responsive Card System */
+.card-responsive {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.75rem;
+  padding: var(--mobile-padding);
+  backdrop-filter: blur(10px);
+}
+
+/* Responsive Button System */
+.btn-responsive {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  white-space: nowrap;
+  min-height: 44px; /* Touch target minimum */
+}
+
+.btn-responsive-sm {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  min-height: 36px;
+}
+
+.btn-responsive-lg {
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  min-height: 48px;
+}
+
+/* Mobile Header */
+.mobile-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mobile-header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem var(--mobile-padding);
+  min-height: 60px;
+}
+
+/* Mobile Menu Button */
+.mobile-menu-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.mobile-menu-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(45deg, #fbbf24, #f59e0b, #d97706);
+  border-radius: 8px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.mobile-menu-btn:hover::before {
+  opacity: 0.2;
+}
+
+.mobile-menu-btn span {
+  width: 20px;
+  height: 2px;
+  background: white;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  z-index: 1;
+}
+
+.mobile-menu-btn.open span:nth-child(1) {
+  transform: rotate(45deg) translate(5px, 5px);
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+
+.mobile-menu-btn.open span:nth-child(2) {
+  opacity: 0;
+  transform: scale(0);
+}
+
+.mobile-menu-btn.open span:nth-child(3) {
+  transform: rotate(-45deg) translate(7px, -6px);
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+/* Cool Animation Classes */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
+  50% { box-shadow: 0 0 30px rgba(139, 92, 246, 0.6); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Mobile Game Cards */
+.game-card-mobile {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 1rem;
+  padding: 1rem;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s;
+}
+
+.game-card-mobile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Mobile Form Elements */
+.input-mobile {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 1rem;
+  min-height: 44px;
+}
+
+.input-mobile::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Mobile Modal */
+.modal-mobile {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal-content-mobile {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Mobile Stats Grid */
+.stats-grid-mobile {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+/* Mobile Action Buttons */
+.action-buttons-mobile {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.action-buttons-mobile .btn-responsive {
+  flex: 1;
+  min-width: 120px;
+}
+
+/* Touch-friendly improvements */
+@media (hover: none) and (pointer: coarse) {
+  .btn-responsive {
+    min-height: 48px;
+    padding: 1rem 1.5rem;
+  }
+  
+  .input-mobile {
+    min-height: 48px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+}
+
+/* Tablet Styles (768px+) */
+@media (min-width: 768px) {
+  .container {
+    padding-left: var(--tablet-padding);
+    padding-right: var(--tablet-padding);
+  }
+  
+  .grid-responsive {
+    gap: var(--tablet-gap);
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .btn-responsive {
+    padding: 0.875rem 1.25rem;
+    font-size: 0.875rem;
+  }
+  
+  .card-responsive {
+    padding: var(--tablet-padding);
+  }
+  
+  .stats-grid-mobile {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+}
+
+/* Desktop Styles (1024px+) */
+@media (min-width: 1024px) {
+  .container {
+    padding-left: var(--desktop-padding);
+    padding-right: var(--desktop-padding);
+    max-width: 1200px;
+  }
+  
+  .grid-responsive {
+    gap: var(--desktop-gap);
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .btn-responsive {
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+  }
+  
+  .card-responsive {
+    padding: var(--desktop-padding);
+  }
+  
+  .stats-grid-mobile {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+/* Large Desktop Styles (1280px+) */
+@media (min-width: 1280px) {
+  .grid-responsive {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  
+  .stats-grid-mobile {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+/* Custom breakpoint for 1022px */
+@media (min-width: 1022px) {
+  .tabs-responsive {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+  }
+  
+  .tabs-responsive .tabs-trigger {
+    flex: 1 !important;
+    min-width: auto !important;
+    white-space: nowrap !important;
+  }
+}
+
+/* Responsive tab improvements - Simplified */
+.tabs-list-responsive {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  position: relative;
+}
+
+.tabs-trigger-responsive {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s;
+  border: none;
+  outline: none;
+  box-shadow: none;
+}
+
+/* Header responsive improvements */
+.header-responsive {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* Enhanced mobile touch targets and spacing */
+@media (max-width: 503px) {
+  /* Larger touch targets for mobile */
+  .mobile-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px 16px;
+  }
+  
+  /* Better spacing for mobile */
+  .mobile-spacing {
+    gap: 16px;
+    padding: 16px;
+  }
+  
+  /* Improved text readability on mobile */
+  .mobile-text {
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  
+  /* Better button sizing for mobile */
+  .mobile-button {
+    padding: 12px 20px;
+    font-size: 16px;
+    border-radius: 12px;
+  }
+  
+  /* Enhanced mobile navigation */
+  .mobile-nav-item {
+    padding: 16px 20px;
+    margin: 8px 0;
+    border-radius: 16px;
+    min-height: 60px;
+  }
+  
+  /* Better mobile header */
+  .mobile-header {
+    padding: 12px 16px;
+    min-height: 70px;
+  }
+  
+  /* Improved mobile tabs */
+  .mobile-tabs {
+    gap: 8px;
+    padding: 8px;
+    overflow-y: hidden;
+  }
+  
+  .mobile-tab {
+    padding: 12px 16px;
+    font-size: 12px;
+    border-radius: 12px;
+    min-height: 48px;
+    min-width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+  }
+  
+  /* Mobile-friendly game cards */
+  .mobile-game-card {
+    padding: 20px;
+    margin: 12px 0;
+    border-radius: 16px;
+    min-height: 120px;
+  }
+  
+  /* Better mobile form inputs */
+  .mobile-input {
+    padding: 16px;
+    font-size: 16px;
+    border-radius: 12px;
+    min-height: 48px;
+  }
+  
+  /* Mobile-optimized modals */
+  .mobile-modal {
+    padding: 20px;
+    border-radius: 20px;
+    margin: 16px;
+  }
+  
+  /* Mobile-friendly game elements */
+  .mobile-game-button {
+    min-height: 60px;
+    padding: 16px;
+    font-size: 16px;
+    border-radius: 16px;
+  }
+  
+  /* Better mobile form spacing */
+  .mobile-form {
+    gap: 20px;
+    padding: 20px;
+  }
+  
+  /* Mobile-optimized cards */
+  .mobile-card {
+    padding: 20px;
+    margin: 12px 0;
+    border-radius: 16px;
+  }
+  
+  /* Mobile-friendly navigation */
+  .mobile-nav {
+    padding: 16px;
+    gap: 12px;
+  }
+  
+  /* Better mobile text sizing */
+  .mobile-heading {
+    font-size: 24px;
+    line-height: 1.3;
+  }
+  
+  .mobile-subheading {
+    font-size: 18px;
+    line-height: 1.4;
+  }
+  
+  /* Mobile-optimized spacing */
+  .mobile-section {
+    padding: 20px 16px;
+    gap: 16px;
+  }
+  
+  /* Better mobile scrolling */
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Enhanced mobile tab container */
+  .mobile-tabs {
+    scrollbar-width: thin;
+    scrollbar-color: #8b5cf6 rgba(139, 92, 246, 0.1);
+    overflow-y: hidden;
+  }
+  
+  /* Ensure tabs don't shrink too much */
+  .mobile-tab {
+    flex-shrink: 0;
+    max-width: none;
+  }
+  
+  /* Better text handling for long tab names */
+  .mobile-tab[data-state="active"] {
+    font-weight: 600;
+  }
+}
+
+/* Super Admin Panel Tabs - Mobile Responsive */
+@media (max-width: 400px) {
+  .mobile-tabs {
+    gap: 4px;
+    padding: 4px;
+  }
+  
+  .mobile-tab {
+    font-size: 10px !important;
+    padding: 8px 12px !important;
+    min-width: 80px !important;
+    min-height: 36px !important;
+  }
+}
+
+/* Super Admin Panel - 320px Mobile Optimization */
+@media (max-width: 320px) {
+  /* Ensure all content fits within 320px */
+  .max-w-\[320px\] {
+    max-width: 300px !important;
+  }
+  
+  /* Optimize form inputs */
+  input, select {
+    font-size: 14px !important;
+    height: 36px !important;
+  }
+  
+  /* Optimize buttons */
+  button {
+    font-size: 14px !important;
+    height: 36px !important;
+    min-height: 36px !important;
+  }
+  
+  /* Optimize labels */
+  label {
+    font-size: 12px !important;
+  }
+  
+  /* Optimize table for mobile */
+  table {
+    font-size: 12px !important;
+  }
+  
+  /* Ensure proper spacing */
+  .space-y-2 > * + * {
+    margin-top: 0.5rem !important;
+  }
+  
+  .space-y-4 > * + * {
+    margin-top: 1rem !important;
+  }
+}
+
+/* User Management Tabs - Mobile Responsive */
+@media (max-width: 640px) {
+  /* Ensure tabs are fully visible on mobile */
+  [role="tablist"] {
+    grid-template-columns: 1fr 1fr 1fr !important;
+    gap: 0.25rem !important;
+  }
+  
+  [role="tab"] {
+    font-size: 11px !important;
+    padding: 0.5rem 0.25rem !important;
+    min-height: 36px !important;
+  }
+}
+
+@media (min-width: 504px) {
+  .header-responsive {
+    flex-direction: row;
+    gap: 1.5rem;
+  }
+}
+
+.header-left-responsive {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (min-width: 504px) {
+  .header-left-responsive {
+    gap: 1rem;
+  }
+}
+
+.header-right-responsive {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+@media (min-width: 504px) {
+  .header-right-responsive {
+    gap: 1rem;
+    justify-content: flex-end;
+  }
+}
+
+/* Ensure proper spacing at 1022px */
+@media (min-width: 1022px) and (max-width: 1279px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* Cool Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1));
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #8b5cf6, #3b82f6, #06b6d4);
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    0 0 10px rgba(139, 92, 246, 0.5),
+    inset 0 0 5px rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #a855f7, #3b82f6, #0891b2);
+  box-shadow: 
+    0 0 20px rgba(139, 92, 246, 0.8),
+    inset 0 0 8px rgba(255, 255, 255, 0.5);
+  transform: scale(1.05);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(135deg, #c084fc, #60a5fa, #22d3ee);
+  box-shadow: 
+    0 0 25px rgba(139, 92, 246, 1),
+    inset 0 0 10px rgba(255, 255, 255, 0.7);
+}
+
+::-webkit-scrollbar-corner {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2));
+  border-radius: 10px;
+}
+
+/* Firefox Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #8b5cf6 rgba(139, 92, 246, 0.1);
+}
+
+/* Custom scrollbar for specific elements */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    0 0 8px rgba(251, 191, 36, 0.5),
+    inset 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #fcd34d, #f59e0b, #ea580c);
+  box-shadow: 
+    0 0 15px rgba(251, 191, 36, 0.8),
+    inset 0 0 5px rgba(255, 255, 255, 0.5);
+}
+
+/* Animated scrollbar for mobile navigation */
+.mobile-nav-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.mobile-nav-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 6px;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.mobile-nav-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #8b5cf6, #a855f7, #c084fc);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    0 0 6px rgba(139, 92, 246, 0.6),
+    inset 0 0 2px rgba(255, 255, 255, 0.3);
+  animation: scrollbarGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes scrollbarGlow {
+  0% {
+    box-shadow: 
+      0 0 6px rgba(139, 92, 246, 0.6),
+      inset 0 0 2px rgba(255, 255, 255, 0.3);
+  }
+  100% {
+    box-shadow: 
+      0 0 12px rgba(139, 92, 246, 0.9),
+      inset 0 0 4px rgba(255, 255, 255, 0.5);
+  }
+}
+
+/* Prevent unintended horizontal scroll on small screens */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Fix tab navigation overflow issues */
+.tabs-list {
+  overflow: hidden !important;
+  position: relative;
+}
+
+.tabs-trigger[data-state="active"] {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
+
+/* Ensure active tab highlight stays within bounds */
+.tabs-trigger[data-state="active"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  border-radius: inherit;
+  z-index: -1;
+  overflow: hidden;
+}
+
+
+
+/* Mobile-optimized tab navigation */
+.tabs-list {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.5) transparent;
+}
+
+.tabs-list::-webkit-scrollbar {
+  height: 6px;
+}
+
+.tabs-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tabs-list::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.5);
+  border-radius: 3px;
+}
+
+.tabs-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.8);
+}
+
+/* Touch-friendly tab sizing for mobile */
+@media (max-width: 640px) {
+  .tabs-list {
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+  
+  .tabs-trigger {
+    min-height: 44px; /* iOS recommended touch target size */
+    touch-action: manipulation;
+  }
+}
+
+/* Ensure active tab highlight stays within bounds */
+.tabs-trigger[data-state="active"] {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+}
+
+.tabs-trigger[data-state="active"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  border-radius: inherit;
+  z-index: -1;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Force hide mobile navigation from 640px to 1980px */
+@media (min-width: 640px) and (max-width: 1980px) {
+  .mobile-menu-btn {
+    display: none !important;
+  }
+}
+
