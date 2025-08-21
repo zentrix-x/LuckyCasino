@@ -1,13 +1,23 @@
 import mongoose from 'mongoose'
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/casino'
+// Prefer cloud URI via env. In production, require it explicitly to avoid
+// falling back to localhost on platforms like Vercel.
+const RESOLVED_MONGO_URI =
+  process.env.MONGO_URI ||
+  process.env.MONGODB_URI ||
+  (process.env.NODE_ENV !== 'production' ? 'mongodb://127.0.0.1:27017/casino' : '')
+
+if (!RESOLVED_MONGO_URI) {
+  throw new Error('MONGO_URI (or MONGODB_URI) is not set')
+}
+
 const MONGO_DB = process.env.MONGO_DB || 'casino'
 
 const g = global as any
 
 export async function connectMongo() {
 	if (!g.__mongoose) {
-		g.__mongoose = mongoose.connect(MONGO_URI, { 
+		g.__mongoose = mongoose.connect(RESOLVED_MONGO_URI, { 
 			dbName: MONGO_DB,
 			// Optimized connection pooling for better performance
 			maxPoolSize: 20, // Reduced for better resource management
