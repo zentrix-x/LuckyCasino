@@ -41,6 +41,8 @@ export async function GET(request: NextRequest) {
       const round = bet.roundId as any
       let result: 'won' | 'lost' | 'pending' = 'pending'
       let payout: number | undefined
+      let roundStatus = round?.status || 'unknown'
+      let roundEndTime = round?.roundEndAt || null
 
       if (round && round.status === 'settled') {
         if (round.winningOutcome === bet.outcome) {
@@ -62,6 +64,9 @@ export async function GET(request: NextRequest) {
         } else {
           result = 'lost'
         }
+      } else if (round && round.status === 'betting' && roundEndTime && new Date(roundEndTime) < new Date()) {
+        // Round has ended but not settled - this is why it shows as pending
+        result = 'pending'
       }
 
       return {
@@ -72,6 +77,8 @@ export async function GET(request: NextRequest) {
         result,
         payout,
         roundId: bet.roundId.toString(),
+        roundStatus,
+        roundEndTime: roundEndTime ? new Date(roundEndTime).toISOString() : null,
         createdAt: bet.createdAt.toISOString()
       }
     })

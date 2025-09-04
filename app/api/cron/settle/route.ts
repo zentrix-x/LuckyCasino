@@ -18,6 +18,7 @@ export async function GET() {
   
   let totalSettled = 0
   let totalErrors = 0
+  const results: any[] = []
   
   for (const gameType of GAME_TYPES) {
     try {
@@ -42,6 +43,7 @@ export async function GET() {
             round.status = 'settled'
             round.winningOutcome = 'no_bets'
             await round.save()
+            totalSettled++
             continue
           }
           
@@ -120,11 +122,25 @@ export async function GET() {
           }
           
           totalSettled++
+          results.push({
+            roundId: round._id,
+            gameType,
+            status: 'settled',
+            totalBets: gameResult.totalBets,
+            totalPayout: gameResult.totalPayout,
+            winningOutcome
+          })
           console.log(`✅ Successfully settled round ${round._id}`)
           
         } catch (roundError) {
           console.error(`❌ Failed to settle round ${round._id}:`, roundError)
           totalErrors++
+          results.push({
+            roundId: round._id,
+            gameType,
+            status: 'error',
+            error: roundError.message
+          })
         }
       }
       
@@ -140,6 +156,7 @@ export async function GET() {
     ok: true,
     settled: totalSettled,
     errors: totalErrors,
+    results,
     timestamp: now.toISOString()
   })
 }

@@ -7,11 +7,32 @@ import { getQuarterBounds, GAME_CONFIG } from '@/lib/config'
 import { GameLogicService } from '@/lib/game-logic'
 import { CommissionService } from '@/lib/commission-service'
 import { publish } from '@/lib/events'
+import jwt from 'jsonwebtoken'
 
 const GAME_TYPES = ['seven_up_down', 'spin_win', 'lottery_0_99']
 
 export async function POST(req: NextRequest) {
   try {
+    // Check authentication
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return Response.json({ success: false, error: 'Authentication required' }, { status: 401 })
+    }
+
+    const token = authHeader.substring(7)
+    
+    // Verify JWT token and check admin permissions
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key')
+      
+      // Check if user has admin permissions
+      if (!decoded.role || !['associate_master', 'master', 'senior_master', 'super_master', 'super_admin'].includes(decoded.role)) {
+        return Response.json({ success: false, error: 'Admin permissions required' }, { status: 403 })
+      }
+    } catch (jwtError) {
+      return Response.json({ success: false, error: 'Invalid token' }, { status: 401 })
+    }
+
     await connectMongo()
     const now = new Date()
     

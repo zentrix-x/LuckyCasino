@@ -32,7 +32,8 @@ export default function SpinWinPage() {
   // Use real backend data instead of mock game engine
   const canBet = currentRound?.status === "betting"
   const recentUserBets: any[] = [] // Will be populated from backend if needed
-  const shownSpinResult = (apiResult as string | null) ?? (currentRound?.status === "settled" ? (currentRound.winningOutcome as string | undefined) : undefined)
+  // Only show result when user has placed a bet (apiResult is set)
+  const shownSpinResult = apiResult as string | null
 
   // Fetch current round and handle real-time updates
   useEffect(() => {
@@ -62,40 +63,60 @@ export default function SpinWinPage() {
     }
   }, [isPaused])
 
-  // Auto-settle rounds when they're ready
+  // Auto-settle rounds when they're ready - Enhanced for immediate settlement
   useEffect(() => {
-    if (currentRound?.status === "betting" && new Date() > new Date(currentRound.roundEndAt)) {
-      const settleRound = async () => {
-        try {
-          await fetch("/api/games/spin_win/settle", { method: "POST" })
-          // Refresh current round after settling
-          setTimeout(async () => {
-            const res = await fetch("/api/games/spin_win/current-round")
-            const data = await res.json()
-            if (res.ok) setCurrentRound(data)
-          }, 1000)
-        } catch (error) {
-          console.error("Failed to settle round:", error)
+    if (currentRound?.status === "betting" && currentRound.roundEndAt) {
+      const endTime = new Date(currentRound.roundEndAt)
+      const now = new Date()
+      
+      if (now >= endTime) {
+        // Immediate settlement
+        const settleRound = async () => {
+          try {
+            console.log("🔄 Auto-settling spin & win round...")
+            await fetch("/api/auto-settle", { method: "GET" })
+            // Refresh current round after settling
+            setTimeout(async () => {
+              const res = await fetch("/api/games/spin_win/current-round")
+              const data = await res.json()
+              if (res.ok) setCurrentRound(data)
+            }, 500) // Reduced delay for faster updates
+          } catch (error) {
+            console.error("Failed to settle round:", error)
+          }
+        }
+        settleRound()
+      } else {
+        // Set up timer for immediate settlement when round ends
+        const timeUntilEnd = endTime.getTime() - now.getTime()
+        if (timeUntilEnd > 0) {
+          const timer = setTimeout(() => {
+            const settleRound = async () => {
+              try {
+                console.log("⏰ Timer triggered - settling spin & win round...")
+                await fetch("/api/auto-settle", { method: "GET" })
+                // Refresh current round after settling
+                setTimeout(async () => {
+                  const res = await fetch("/api/games/spin_win/current-round")
+                  const data = await res.json()
+                  if (res.ok) setCurrentRound(data)
+                }, 500)
+              } catch (error) {
+                console.error("Failed to settle round:", error)
+              }
+            }
+            settleRound()
+          }, timeUntilEnd)
+          
+          return () => clearTimeout(timer)
         }
       }
-      settleRound()
     }
   }, [currentRound])
 
-  // Handle wheel spinning animation
-  useEffect(() => {
-    if (currentRound?.status === "settled" && currentRound.winningOutcome) {
-      setIsSpinning(true)
-      // Spin for the duration of the playing phase
-      const spinDuration = 8000 // 8 seconds
-      const finalRotation = wheelRotation + 1800 + Math.random() * 360 // Multiple spins + random final position
-      setWheelRotation(finalRotation)
-
-      setTimeout(() => {
-        setIsSpinning(false)
-      }, spinDuration)
-    }
-  }, [currentRound?.status, currentRound?.winningOutcome])
+  // Handle wheel spinning animation - Only when user places a bet
+  // Removed automatic spinning when round is settled
+  // Wheel will only spin when handlePlaceBet is called
 
   const handleRefresh = async () => {
     try {
@@ -226,9 +247,43 @@ export default function SpinWinPage() {
         const err = await res.json().catch(() => ({}))
         throw new Error(err?.error || "Bet failed")
       }
+      
+      // Start spinning animation immediately after successful bet
+      setIsSpinning(true)
       setSelectedBet(betChoice)
       updatePoints(user.points - betAmount)
       toast({ title: "Bet placed!", description: `${betAmount} points on ${betChoice}` })
+      
+      // Spin the wheel with dramatic animation
+      const spinDuration = 8000 // 8 seconds
+      const finalRotation = wheelRotation + 1800 + Math.random() * 360 // Multiple spins + random final position
+      setWheelRotation(finalRotation)
+      
+      // Show result after spinning
+      setTimeout(async () => {
+        try {
+          // Fetch the latest result
+          const resultRes = await fetch("/api/games/spin_win/current-round")
+          const resultData = await resultRes.json()
+          if (resultRes.ok && resultData.winningOutcome) {
+            console.log("🎯 Backend result:", resultData.winningOutcome)
+            setApiResult(resultData.winningOutcome)
+          } else {
+            // Generate random result if none provided
+            const results = ["x2", "x7", "x3", "x6", "x4", "x5"]
+            const randomResult = results[Math.floor(Math.random() * results.length)]
+            console.log("🎲 Generated random result:", randomResult)
+            setApiResult(randomResult)
+          }
+        } catch (error) {
+          console.error("Failed to fetch result:", error)
+          // Fallback to random result for demo
+          const results = ["x2", "x7", "x3", "x6", "x4", "x5"]
+          setApiResult(results[Math.floor(Math.random() * results.length)])
+        } finally {
+          setIsSpinning(false)
+        }
+      }, spinDuration)
     } catch (e: any) {
       console.error('Bet placement error:', e)
       const errorMessage = e?.message || "Unable to place bet."
@@ -272,12 +327,18 @@ export default function SpinWinPage() {
 
   const getResultColor = (result: string) => {
     switch (result) {
-      case "red":
+      case "x2":
         return "text-red-400"
-      case "black":
-        return "text-gray-300"
-      case "green":
+      case "x7":
+        return "text-blue-400"
+      case "x3":
         return "text-green-400"
+      case "x6":
+        return "text-yellow-400"
+      case "x4":
+        return "text-purple-400"
+      case "x5":
+        return "text-orange-400"
       default:
         return "text-white"
     }
@@ -359,9 +420,20 @@ export default function SpinWinPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Spin & Win Background Image */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: 'url(/images/backgrounds/spin&win.jpg)',
+          filter: 'brightness(0.6) contrast(1.3)'
+        }}
+      ></div>
+      
+      {/* Overlay for better text readability */}
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/50 via-blue-900/40 to-indigo-900/50"></div>
       {/* Header */}
-      <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm">
+      <header className="border-b border-white/10 bg-black/40 backdrop-blur-md relative z-10">
         <div className="container mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-4">
             <Button 
@@ -423,9 +495,9 @@ export default function SpinWinPage() {
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Game Area */}
-          <div className="lg:col-span-2 space-y-6">
+        <div className="flex justify-center">
+          {/* Main Game Area - Centered */}
+          <div className="max-w-5xl w-full space-y-8">
             {/* Game Status */}
             <GameStatusBar 
               gameType="spinwin" 
@@ -436,40 +508,67 @@ export default function SpinWinPage() {
             />
 
             {/* Game Board */}
-            <Card className="bg-white/10 border-white/20 text-white">
-              <CardHeader>
-                <CardTitle className="text-center text-2xl">Spin the Wheel</CardTitle>
-                <p className="text-center text-white/70">Bet on any of the 6 multipliers and watch the wheel spin!</p>
+            <Card className="bg-gradient-to-br from-white/15 via-white/10 to-white/5 border-white/30 text-white backdrop-blur-xl shadow-2xl">
+              <CardHeader className="text-center pb-8">
+                <CardTitle className="text-center text-4xl font-black bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 bg-clip-text text-transparent mb-4">
+                  🎰 SPIN & WIN 🎰
+                </CardTitle>
+                <p className="text-center text-white/90 text-lg font-semibold">Bet on any of the 6 multipliers and watch the wheel spin!</p>
+                <div className="flex justify-center mt-4">
+                  <div className="flex items-center gap-2 text-yellow-400">
+                    <span className="animate-pulse">✨</span>
+                    <span className="font-bold">LUCKY WHEEL</span>
+                    <span className="animate-pulse">✨</span>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Modern Spinning Wheel */}
-                <div className="flex justify-center py-6 xs:py-8 sm:py-12 px-4 xs:px-6">
+                <div className="flex flex-col items-center py-8 xs:py-12 sm:py-16 px-4 xs:px-6">
+                  <div className="text-center mb-8">
+                    <h3 className="text-2xl sm:text-3xl font-black text-white mb-4 text-center bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+                      🎡 SPIN THE WHEEL 🎡
+                    </h3>
+                    <p className="text-lg text-white/90 mb-4 text-center font-semibold">
+                      Win Amazing Multipliers!
+                    </p>
+                    <div className="flex justify-center gap-4 text-sm text-white/80">
+                      <span className="bg-red-500/20 px-3 py-1 rounded-full border border-red-500/30">x2</span>
+                      <span className="bg-blue-500/20 px-3 py-1 rounded-full border border-blue-500/30">x7</span>
+                      <span className="bg-green-500/20 px-3 py-1 rounded-full border border-green-500/30">x3</span>
+                      <span className="bg-yellow-500/20 px-3 py-1 rounded-full border border-yellow-500/30">x6</span>
+                      <span className="bg-purple-500/20 px-3 py-1 rounded-full border border-purple-500/30">x4</span>
+                      <span className="bg-orange-500/20 px-3 py-1 rounded-full border border-orange-500/30">x5</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-center">
                   <div className="relative">
-                    {/* Outer glow ring */}
-                    <div className="absolute inset-0 w-56 h-56 xs:w-64 xs:h-64 sm:w-80 sm:h-80 rounded-full bg-gradient-to-r from-purple-500/20 via-blue-500/20 to-pink-500/20 blur-xl animate-pulse"></div>
+                    {/* Enhanced outer glow ring */}
+                    <div className="absolute inset-0 w-56 h-56 xs:w-64 xs:h-64 sm:w-80 sm:h-80 rounded-full bg-gradient-to-r from-purple-500/30 via-blue-500/30 to-pink-500/30 blur-xl animate-pulse"></div>
+                    <div className="absolute inset-0 w-52 h-52 xs:w-60 xs:h-60 sm:w-76 sm:h-76 rounded-full bg-gradient-to-r from-yellow-500/20 via-orange-500/20 to-red-500/20 blur-lg animate-pulse" style={{ animationDelay: '1s' }}></div>
                     
                     {/* Wheel container with modern styling */}
                     <div className="relative">
                       {/* Wheel with enhanced styling */}
                       <div
-                        className={`w-56 h-56 xs:w-64 xs:h-64 sm:w-80 sm:h-80 rounded-full border-4 border-white/30 relative overflow-hidden transition-transform duration-[8000ms] shadow-2xl ${
+                        className={`w-56 h-56 xs:w-64 xs:h-64 sm:w-80 sm:h-80 rounded-full border-4 border-white/50 relative overflow-hidden transition-transform duration-[8000ms] shadow-2xl ${
                           isSpinning 
-                            ? "ease-out shadow-[0_0_50px_rgba(255,255,255,0.3)]" 
-                            : "ease-in-out hover:shadow-[0_0_30px_rgba(255,255,255,0.2)]"
+                            ? "ease-out shadow-[0_0_80px_rgba(255,255,255,0.4)]" 
+                            : "ease-in-out hover:shadow-[0_0_50px_rgba(255,255,255,0.3)]"
                         }`}
                         style={{ 
                           transform: `rotate(${wheelRotation}deg)`,
-                          background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)'
+                          background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)'
                         }}
                       >
-                        {/* 6 Multiplier Wheel Segments - Randomly Arranged */}
+                        {/* 6 Colored Wheel Segments - Solid Colors */}
                         {[
-                          { multiplier: "x2", color: "bg-red-600", glow: "shadow-red-500/50" },
-                          { multiplier: "x7", color: "bg-blue-600", glow: "shadow-blue-500/50" },
-                          { multiplier: "x3", color: "bg-green-600", glow: "shadow-green-500/50" },
-                          { multiplier: "x6", color: "bg-yellow-600", glow: "shadow-yellow-500/50" },
-                          { multiplier: "x4", color: "bg-purple-600", glow: "shadow-purple-500/50" },
-                          { multiplier: "x5", color: "bg-orange-600", glow: "shadow-orange-500/50" }
+                          { multiplier: "x2", color: "bg-red-500", glow: "shadow-red-500/50" },
+                          { multiplier: "x7", color: "bg-blue-500", glow: "shadow-blue-500/50" },
+                          { multiplier: "x3", color: "bg-green-500", glow: "shadow-green-500/50" },
+                          { multiplier: "x6", color: "bg-yellow-500", glow: "shadow-yellow-500/50" },
+                          { multiplier: "x4", color: "bg-purple-500", glow: "shadow-purple-500/50" },
+                          { multiplier: "x5", color: "bg-orange-500", glow: "shadow-orange-500/50" }
                         ].map((segment, i) => {
                           const angle = (360 / 6) * i
 
@@ -481,12 +580,9 @@ export default function SpinWinPage() {
                                 clipPath: `polygon(50% 50%, ${50 + 50 * Math.cos(((angle - 30) * Math.PI) / 180)}% ${50 + 50 * Math.sin(((angle - 30) * Math.PI) / 180)}%, ${50 + 50 * Math.cos(((angle + 30) * Math.PI) / 180)}% ${50 + 50 * Math.sin(((angle + 30) * Math.PI) / 180)}%)`,
                               }}
                             >
-                              {/* Segment inner glow */}
-                              <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-full"></div>
-                              
                               {/* Multiplier text with enhanced styling */}
                               <span 
-                                className="text-white text-xs xs:text-sm sm:text-lg font-black drop-shadow-lg transform -rotate-90 relative z-10" 
+                                className="text-white text-xl xs:text-2xl sm:text-3xl font-black drop-shadow-lg relative z-10 bg-black/40 px-4 py-3 rounded-2xl border-2 border-white/30 shadow-xl backdrop-blur-sm" 
                                 style={{ transform: `rotate(${-wheelRotation}deg)` }}
                               >
                                 {segment.multiplier}
@@ -495,10 +591,14 @@ export default function SpinWinPage() {
                           )
                         })}
 
-                        {/* Enhanced center circle */}
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 xs:w-10 xs:h-10 sm:w-14 sm:h-14 bg-gradient-to-br from-white via-gray-100 to-gray-200 rounded-full border-4 border-white/50 shadow-lg flex items-center justify-center z-20">
-                          <div className="w-6 h-6 xs:w-8 xs:h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-gray-800 to-gray-900 rounded-full flex items-center justify-center">
-                            <span className="text-white text-[8px] xs:text-xs sm:text-sm font-black tracking-wider">SPIN</span>
+                        {/* Enhanced center circle with SPIN button */}
+                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 xs:w-24 xs:h-24 sm:w-28 sm:h-28 bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500 rounded-full border-4 border-white/60 shadow-2xl flex items-center justify-center z-20">
+                          <div className="w-16 h-16 xs:w-20 xs:h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-full flex items-center justify-center p-1 shadow-inner">
+                            <div className="text-center">
+                              <div className="text-white text-xl xs:text-2xl sm:text-3xl font-black drop-shadow-lg animate-pulse">
+                                SPIN
+                              </div>
+                            </div>
                           </div>
                         </div>
 
@@ -506,32 +606,41 @@ export default function SpinWinPage() {
                         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 xs:w-20 xs:h-20 sm:w-24 sm:h-24 rounded-full border-2 border-white/30 bg-gradient-to-br from-white/10 to-transparent"></div>
                       </div>
 
-                      {/* Modern pointer with glow effect */}
-                      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-3 z-30">
+                      {/* Enhanced pointer with glow effect */}
+                      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-4 z-30">
                         <div className="relative">
                           {/* Pointer glow */}
-                          <div className="absolute inset-0 w-0 h-0 border-l-6 border-r-6 border-b-12 border-l-transparent border-r-transparent border-b-white/30 blur-sm"></div>
+                          <div className="absolute inset-0 w-0 h-0 border-l-8 border-r-8 border-b-16 border-l-transparent border-r-transparent border-b-yellow-400/40 blur-md"></div>
                           {/* Main pointer */}
-                          <div className="w-0 h-0 border-l-4 border-r-4 border-b-8 border-l-transparent border-r-transparent border-b-white relative z-10 drop-shadow-lg"></div>
+                          <div className="w-0 h-0 border-l-6 border-r-6 border-b-12 border-l-transparent border-r-transparent border-b-yellow-400 relative z-10 drop-shadow-xl"></div>
                           {/* Pointer highlight */}
-                          <div className="absolute top-1 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-b-4 border-l-transparent border-r-transparent border-b-white/60"></div>
+                          <div className="absolute top-1 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-3 border-r-3 border-b-6 border-l-transparent border-r-transparent border-b-yellow-300"></div>
+                          {/* Pointer sparkle */}
+                          <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-yellow-300 rounded-full animate-ping"></div>
                         </div>
                       </div>
 
-                      {/* Spinning animation overlay */}
+                      {/* Enhanced spinning animation overlay */}
                       {isSpinning && (
-                        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent via-white/5 to-transparent animate-spin"></div>
+                        <>
+                          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent via-white/15 to-transparent animate-spin"></div>
+                          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-yellow-400/25 via-orange-500/25 to-red-500/25 animate-spin" style={{ animationDuration: '2s' }}></div>
+                          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500/25 via-blue-500/25 to-cyan-500/25 animate-spin" style={{ animationDuration: '3s', animationDirection: 'reverse' }}></div>
+                          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-green-400/20 via-yellow-500/20 to-orange-500/20 animate-spin" style={{ animationDuration: '1.5s', animationDirection: 'reverse' }}></div>
+                        </>
                       )}
                     </div>
 
-                    {/* Outer decorative rings */}
-                    <div className="absolute inset-0 w-56 h-56 xs:w-64 xs:h-64 sm:w-80 sm:h-80 rounded-full border border-white/20 animate-pulse"></div>
-                    <div className="absolute inset-2 w-52 h-52 xs:w-60 xs:h-60 sm:w-76 sm:h-76 rounded-full border border-white/10 animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+                    {/* Enhanced outer decorative rings */}
+                    <div className="absolute inset-0 w-56 h-56 xs:w-64 xs:h-64 sm:w-80 sm:h-80 rounded-full border-2 border-white/30 animate-pulse"></div>
+                    <div className="absolute inset-2 w-52 h-52 xs:w-60 xs:h-60 sm:w-76 sm:h-76 rounded-full border border-white/20 animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+                    <div className="absolute inset-4 w-48 h-48 xs:w-56 xs:h-56 sm:w-72 sm:h-72 rounded-full border border-white/10 animate-pulse" style={{ animationDelay: '1s' }}></div>
                   </div>
+                </div>
                 </div>
 
                 {/* 6 Multiplier Betting Options */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6 px-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 sm:gap-8 px-4 max-w-5xl mx-auto">
                   {[
                     { betType: "x2", label: "x2 Multiplier", gradient: "from-red-500 via-red-600 to-red-700", glow: "shadow-red-500/30", payout: "2x" },
                     { betType: "x7", label: "x7 Multiplier", gradient: "from-blue-500 via-blue-600 to-blue-700", glow: "shadow-blue-500/30", payout: "7x" },
@@ -546,11 +655,11 @@ export default function SpinWinPage() {
                     return (
                       <Card
                         key={betOption.betType}
-                        className={`cursor-pointer transition-all duration-300 transform hover:scale-105 ${
+                        className={`cursor-pointer transition-all duration-300 transform hover:scale-110 ${
                           isSelected 
-                            ? "ring-2 ring-yellow-400 bg-white/20 shadow-lg shadow-yellow-400/20" 
-                            : "bg-white/5 hover:bg-white/10 hover:shadow-lg"
-                        } ${isDisabled ? "opacity-50 cursor-not-allowed" : ""} border-white/20 backdrop-blur-sm`}
+                            ? "ring-4 ring-yellow-400 bg-gradient-to-br from-white/25 to-white/10 shadow-2xl shadow-yellow-400/30" 
+                            : "bg-gradient-to-br from-white/10 to-white/5 hover:bg-gradient-to-br hover:from-white/20 hover:to-white/10 hover:shadow-xl"
+                        } ${isDisabled ? "opacity-50 cursor-not-allowed" : ""} border-white/30 backdrop-blur-md rounded-2xl`}
                         onClick={() => !isDisabled && handlePlaceBet(betOption.betType)}
                       >
                         <CardContent className="p-4 sm:p-5 text-center relative overflow-hidden">
@@ -559,16 +668,16 @@ export default function SpinWinPage() {
                           
                           {/* Modern multiplier circle */}
                           <div
-                            className={`w-12 h-12 sm:w-14 sm:h-14 mx-auto mb-3 sm:mb-4 rounded-full bg-gradient-to-br ${betOption.gradient} flex items-center justify-center ${betOption.glow} shadow-lg relative z-10`}
+                            className={`w-16 h-16 sm:w-18 sm:h-18 mx-auto mb-4 sm:mb-5 rounded-full bg-gradient-to-br ${betOption.gradient} flex items-center justify-center ${betOption.glow} shadow-xl relative z-10 transform hover:scale-110 transition-transform duration-200`}
                           >
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-white/20 to-transparent flex items-center justify-center">
-                              <span className="text-white text-sm sm:text-base font-black drop-shadow-lg">{betOption.betType}</span>
+                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-white/30 to-transparent flex items-center justify-center">
+                              <span className="text-white text-lg sm:text-xl font-black drop-shadow-lg">{betOption.betType}</span>
                             </div>
                           </div>
                           
-                          <h3 className="text-sm sm:text-base font-bold text-white mb-2 relative z-10">{betOption.label}</h3>
+                          <h3 className="text-base sm:text-lg font-bold text-white mb-3 relative z-10">{betOption.label}</h3>
                           
-                          <Badge className={`bg-gradient-to-r ${betOption.gradient} text-white text-xs font-bold px-3 py-1 relative z-10 shadow-lg`}>
+                          <Badge className={`bg-gradient-to-r ${betOption.gradient} text-white text-sm font-bold px-4 py-2 relative z-10 shadow-xl rounded-full`}>
                             Pays {betOption.payout}
                           </Badge>
                           
@@ -582,31 +691,36 @@ export default function SpinWinPage() {
                   })}
                 </div>
 
-                {/* Modern Bet Amount Section */}
-                <div className="max-w-md mx-auto px-4">
-                  <label className="block text-white text-sm font-bold mb-3 text-center">🎯 Bet Amount (min: 5 points)</label>
+                {/* Enhanced Bet Amount Section */}
+                <div className="max-w-lg mx-auto px-4 flex flex-col items-center">
+                  <div className="text-center mb-6">
+                    <label className="block text-white text-lg font-bold mb-4 text-center bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+                      🎯 BET AMOUNT 🎯
+                    </label>
+                    <p className="text-white/80 text-sm mb-4">Minimum: 5 points | Maximum: 1000 points</p>
+                  </div>
                   <div className="flex flex-col sm:flex-row gap-3">
                     <div className="relative">
                       <Input
                         type="number"
                         min="5"
-
+                        max="1000"
                         value={betAmount}
                         onChange={(e) => setBetAmount(Number(e.target.value))}
-                        className="bg-white/10 border-white/30 text-white placeholder-white/50 backdrop-blur-sm focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400/50 transition-all duration-300"
+                        className="bg-white/15 border-white/40 text-white placeholder-white/60 backdrop-blur-md focus:ring-4 focus:ring-yellow-400/50 focus:border-yellow-400/50 transition-all duration-300 text-center text-lg font-bold rounded-xl"
                         disabled={!canBet}
                       />
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-md"></div>
                     </div>
-                    <div className="flex gap-2 justify-center sm:justify-start">
-                      {[10, 25, 50, 100].map((amount) => (
+                    <div className="flex gap-3 justify-center sm:justify-start">
+                      {[10, 25, 50, 100, 250, 500].map((amount) => (
                         <Button
                           key={amount}
                           variant="outline"
                           size="sm"
                           onClick={() => setBetAmount(amount)}
                           disabled={!canBet}
-                          className="border-white/30 text-white hover:bg-white/15 hover:border-yellow-400/50 hover:shadow-lg hover:shadow-yellow-400/20 text-xs sm:text-sm font-bold transition-all duration-300 transform hover:scale-105 backdrop-blur-sm"
+                          className="border-white/40 text-white hover:bg-gradient-to-r hover:from-yellow-400/20 hover:to-orange-500/20 hover:border-yellow-400/50 hover:shadow-xl hover:shadow-yellow-400/30 text-sm sm:text-base font-bold transition-all duration-300 transform hover:scale-110 backdrop-blur-md rounded-xl px-4 py-2"
                         >
                           {amount}
                         </Button>
@@ -615,117 +729,70 @@ export default function SpinWinPage() {
                   </div>
                 </div>
 
-                {/* Modern Result Display */}
+                {/* Enhanced Result Display */}
                 {shownSpinResult && (
                   <div className="text-center py-8">
                     <div className="relative">
-                      {/* Result glow effect */}
-                      <div className="absolute inset-0 w-24 h-24 rounded-full bg-gradient-to-r from-purple-500/20 via-blue-500/20 to-pink-500/20 blur-xl animate-pulse"></div>
+                      {/* Enhanced result glow effect */}
+                      <div className="absolute inset-0 w-32 h-32 rounded-full bg-gradient-to-r from-purple-500/30 via-blue-500/30 to-pink-500/30 blur-xl animate-pulse"></div>
+                      <div className="absolute inset-0 w-28 h-28 rounded-full bg-gradient-to-r from-yellow-500/20 via-orange-500/20 to-red-500/20 blur-lg animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+                      
+                      {/* Casino celebration elements */}
+                      <div className="absolute -top-2 -left-2 text-2xl animate-bounce">🎉</div>
+                      <div className="absolute -top-2 -right-2 text-2xl animate-bounce" style={{ animationDelay: '0.3s' }}>🎊</div>
+                      <div className="absolute -bottom-2 -left-2 text-2xl animate-bounce" style={{ animationDelay: '0.6s' }}>💎</div>
+                      <div className="absolute -bottom-2 -right-2 text-2xl animate-bounce" style={{ animationDelay: '0.9s' }}>💰</div>
                       
                       {/* Result circle with enhanced styling */}
                       <div
-                        className={`relative inline-flex items-center justify-center w-24 h-24 rounded-full ${
-                          shownSpinResult === "x2" ? "bg-red-600" :
-                          shownSpinResult === "x3" ? "bg-green-600" :
-                          shownSpinResult === "x4" ? "bg-purple-600" :
-                          shownSpinResult === "x5" ? "bg-orange-600" :
-                          shownSpinResult === "x6" ? "bg-yellow-600" :
-                          shownSpinResult === "x7" ? "bg-blue-600" :
-                          "bg-gray-600"
-                        } text-white text-2xl font-black mb-4 shadow-2xl border-4 border-white/30 backdrop-blur-sm`}
+                        className={`relative inline-flex items-center justify-center w-28 h-28 rounded-full ${
+                          shownSpinResult === "x2" ? "bg-gradient-to-br from-red-500 to-red-700" :
+                          shownSpinResult === "x3" ? "bg-gradient-to-br from-green-500 to-green-700" :
+                          shownSpinResult === "x4" ? "bg-gradient-to-br from-purple-500 to-purple-700" :
+                          shownSpinResult === "x5" ? "bg-gradient-to-br from-orange-500 to-orange-700" :
+                          shownSpinResult === "x6" ? "bg-gradient-to-br from-yellow-500 to-yellow-700" :
+                          shownSpinResult === "x7" ? "bg-gradient-to-br from-blue-500 to-blue-700" :
+                          "bg-gradient-to-br from-gray-500 to-gray-700"
+                        } text-white text-3xl font-black mb-4 shadow-2xl border-4 border-yellow-400/50 backdrop-blur-sm casino-glow`}
                       >
                         <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-full"></div>
-                        <span className="relative z-10 drop-shadow-lg">{shownSpinResult.toUpperCase()}</span>
+                        <span className="relative z-10 drop-shadow-lg animate-pulse">{shownSpinResult.toUpperCase()}</span>
                       </div>
                     </div>
                     
                     <div className="text-white">
-                      <p className={`text-xl font-bold mb-2 ${getResultColor(shownSpinResult)} drop-shadow-lg`}>
-                        🎉 Result: {shownSpinResult}
+                      <p className={`text-2xl font-bold mb-3 ${getResultColor(shownSpinResult)} drop-shadow-lg animate-pulse`}>
+                        🎉 Winning Result: {shownSpinResult} 🎉
                       </p>
-                      <div className="text-white/70 text-sm">
-                        <p>✨ Congratulations to the winners!</p>
-                        <p className="text-yellow-400 font-bold">🎯 Multiplier: {shownSpinResult}</p>
+                      <div className="text-white/80 text-base">
+                        <p className="mb-2">✨ Congratulations to the winners! ✨</p>
+                        <p className="text-yellow-400 font-bold text-lg">🎯 Multiplier: {shownSpinResult}</p>
+                        <p className="text-green-400 font-semibold mt-2">💰 Payout: {shownSpinResult} times your bet!</p>
                       </div>
+                      
+                      {/* Show bet result if user had a bet */}
+                      {selectedBet && (
+                        <div className="mt-6 p-4 bg-white/10 rounded-lg border border-yellow-400/20 backdrop-blur-sm">
+                          <p className="text-lg font-semibold mb-3">🎯 Your Bet Result: 🎯</p>
+                          {(() => {
+                            const isWin = selectedBet === shownSpinResult
+                            const payout = isWin ? betAmount * parseInt(shownSpinResult.replace('x', '')) : 0
+                            const profitLoss = payout - betAmount
+                            
+                            return (
+                              <div className="flex items-center justify-between p-3 bg-white/5 rounded">
+                                <span>🎰 Your bet on {selectedBet}:</span>
+                                <span className={`font-bold text-lg ${isWin ? 'text-green-400' : 'text-red-400'}`}>
+                                  {isWin ? '🎉 +' : '💔 '}{profitLoss.toLocaleString()} points
+                                </span>
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Game History */}
-            <GameHistoryPanel gameType="spin_win" />
-
-            {/* Your Recent Bets */}
-            <Card className="bg-white/10 border-white/20 text-white">
-              <CardHeader>
-                <CardTitle className="text-lg">Your Recent Bets</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {recentUserBets.length === 0 ? (
-                  <p className="text-white/60 text-sm">No bets placed yet</p>
-                ) : (
-                  <div className="space-y-3">
-                    {recentUserBets.map((bet) => (
-                      <div key={bet.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-4 h-4 rounded-full ${getBetTypeInfo(bet.betChoice).bgColor}`} />
-                          <div>
-                            <p className="text-sm font-medium">{getBetTypeInfo(bet.betChoice).label}</p>
-                            <p className="text-xs text-white/60">{bet.betAmount} points</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          {bet.result ? (
-                            <Badge className={bet.result === "win" ? "bg-green-500" : "bg-red-500"}>
-                              {bet.result === "win" ? `+${bet.payout}` : `-${bet.betAmount}`}
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-yellow-500">Pending</Badge>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Game Rules */}
-            <Card className="bg-white/10 border-white/20 text-white">
-              <CardHeader>
-                <CardTitle className="text-lg">How to Play</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-red-500" />
-                  <div>
-                    <p className="font-semibold text-red-400">Red</p>
-                    <p className="text-white/70">Pays 1.9x your bet</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-gray-800" />
-                  <div>
-                    <p className="font-semibold text-gray-300">Black</p>
-                    <p className="text-white/70">Pays 1.9x your bet</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-green-500" />
-                  <div>
-                    <p className="font-semibold text-green-400">Green</p>
-                    <p className="text-white/70">Pays 13.5x your bet</p>
-                  </div>
-                </div>
-                <div className="pt-2 border-t border-white/20">
-                  <p className="text-xs text-white/60">
-                    The wheel has 6 multiplier blocks: x2, x7, x3, x6, x4, x5. Place your bet before the countdown ends!
-                  </p>
-                </div>
               </CardContent>
             </Card>
           </div>

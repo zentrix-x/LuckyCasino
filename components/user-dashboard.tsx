@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/hooks/use-auth"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { TrendingUp, TrendingDown, Target, Zap, Ticket } from "lucide-react"
 import { AdminStatsCards } from "./admin-stats-cards"
 import { UserManagementPanel } from "./user-management-panel"
@@ -27,9 +27,30 @@ import { PointReturnModal } from "./point-return-modal"
 export function UserDashboard() {
   const { user, logout } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
   const [activeGame, setActiveGame] = useState<string | null>(null)
   const [showReturnModal, setShowReturnModal] = useState(false)
   const [activeTab, setActiveTab] = useState<string>("games")
+
+  // Only show mobile navigation on the main dashboard page
+  const isDashboardPage = pathname === "/"
+
+  // Handle URL parameters for tab switching
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (tab && ['games', 'recent', 'history', 'community', 'manage', 'admin', 'super'].includes(tab)) {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
+
+  // Update URL when tab changes
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    const url = new URL(window.location.href)
+    url.searchParams.set('tab', value)
+    router.replace(url.pathname + url.search, { scroll: false })
+  }
 
   if (!user) return null
 
@@ -53,16 +74,38 @@ export function UserDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 dark:from-gray-900 dark:via-blue-950 dark:to-indigo-950">
-      {/* Header */}
-      <header className="border-b border-white/10 dark:border-gray-700 bg-black/20 dark:bg-gray-900/20 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
-              <span className="text-black font-bold text-sm">🎰</span>
+    <div 
+      className="min-h-screen relative"
+      style={{
+        backgroundImage: 'url(/images/backgrounds/game-room.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
+      {/* Semi-transparent overlay for better readability while keeping background visible */}
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px]"></div>
+      
+      {/* Content */}
+      <div className="relative z-10">
+      {/* Enhanced Header */}
+      <header className="border-b-2 border-yellow-400/40 bg-gradient-to-r from-black/80 via-black/70 to-black/80 backdrop-blur-2xl shadow-2xl">
+        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <div className="relative">
+              <div className="w-12 h-12 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 rounded-full flex items-center justify-center shadow-2xl">
+                <span className="text-black font-black text-xl">🎰</span>
+              </div>
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-ping"></div>
             </div>
-            <h1 className="text-2xl font-bold text-white">Lucky Casino</h1>
-            <Badge className={`${getRoleBadgeColor(user.role)} text-white max-[450px]:hidden`}>
+            <div>
+              <h1 className="text-3xl font-black text-white">
+                <span className="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 bg-clip-text text-transparent">LUCKY</span>{" "}
+                <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">CASINO</span>
+              </h1>
+              <p className="text-yellow-400 text-sm font-bold">🎯 VIP GAMING EXPERIENCE</p>
+            </div>
+            <Badge className={`${getRoleBadgeColor(user.role)} text-white font-black px-4 py-2 text-sm shadow-xl max-[450px]:hidden`}>
               {user.role.replace("_", " ").toUpperCase()}
             </Badge>
           </div>
@@ -85,8 +128,21 @@ export function UserDashboard() {
               </Button>
             )}
             <ThemeToggle />
-            {/* Mobile navigation button + overlay */}
-            <MobileNavigation />
+            {/* Mobile menu button */}
+            <button
+              className="max-[639px]:block min-[640px]:hidden relative group"
+              onClick={() => {
+                // This will be handled by the MobileNavigation component
+                const mobileNav = document.querySelector('.mobile-menu-btn') as HTMLElement
+                if (mobileNav) mobileNav.click()
+              }}
+              aria-label="Toggle mobile menu"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-lg opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+              <span className="relative block w-6 h-0.5 bg-white transition-all duration-300"></span>
+              <span className="relative block w-6 h-0.5 bg-white transition-all duration-300 mt-1.5"></span>
+              <span className="relative block w-6 h-0.5 bg-white transition-all duration-300 mt-1.5"></span>
+            </button>
             <Button variant="outline" onClick={logout} className="min-[640px]:block max-[639px]:hidden">
               Logout
             </Button>
@@ -95,7 +151,7 @@ export function UserDashboard() {
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           {/* Desktop/Tablet tab list (hidden on mobile where mobile-navigation is used) */}
           <TabsList className="flex w-full overflow-x-auto bg-white/10 dark:bg-gray-800/50 border border-white/20 dark:border-gray-700 rounded-xl gap-1 p-1 custom-scrollbar tabs-list min-[640px]:flex max-[639px]:hidden">
             <TabsTrigger value="games" className="text-gray-800 dark:text-gray-200 data-[state=active]:bg-white/20 dark:data-[state=active]:bg-gray-700/50 data-[state=active]:text-black dark:data-[state=active]:text-white rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap flex-shrink-0 min-w-[70px] text-center">Games</TabsTrigger>
@@ -113,101 +169,136 @@ export function UserDashboard() {
             )}
           </TabsList>
 
-          <TabsContent value="games" className="mt-6">
-            <div className="grid md:grid-cols-3 gap-6">
-              <Card className="bg-white/10 dark:bg-gray-800/50 border-white/20 dark:border-gray-700 text-white dark:text-gray-200 cursor-pointer hover:bg-white/15 dark:hover:bg-gray-700/50 transition-all duration-200 hover:scale-105">
-                <CardHeader>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-blue-500 rounded-full flex items-center justify-center">
-                      <div className="flex gap-1">
-                        <TrendingDown className="w-4 h-4" />
-                        <Target className="w-4 h-4" />
-                        <TrendingUp className="w-4 h-4" />
+          <TabsContent value="games" className="mt-8">
+            <div className="grid md:grid-cols-3 gap-8">
+              <Card className="bg-purple-100/60 border-2 border-purple-200/60 text-gray-800 cursor-pointer hover:scale-105 transition-all duration-300 shadow-xl group backdrop-blur-sm">
+                <CardHeader className="pb-4">
+                  <div className="relative">
+                    <div className="w-full h-32 bg-purple-100/40 rounded-lg mb-4 flex items-center justify-center">
+                      <div className="relative">
+                        <div className="w-20 h-20 bg-gradient-to-r from-red-500 to-blue-500 rounded-full flex items-center justify-center shadow-lg">
+                          <div className="flex gap-1">
+                            <TrendingDown className="w-6 h-6 text-white" />
+                            <Target className="w-6 h-6 text-white" />
+                            <TrendingUp className="w-6 h-6 text-white" />
+                          </div>
+                        </div>
+                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-md">
+                          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <CardTitle>7Up 7Down</CardTitle>
-                      <Badge className="bg-green-500 text-white text-xs">Live</Badge>
+                    <div className="absolute top-2 right-2 flex gap-2">
+                      <Badge className="bg-purple-500 text-white font-bold px-2 py-1 text-xs">Up to 11.5x</Badge>
+                      <Badge className="bg-green-500 text-white font-bold px-2 py-1 text-xs">🔥 LIVE</Badge>
                     </div>
                   </div>
-                  <CardDescription className="text-white/70 dark:text-gray-300">
-                    Predict if the next number will be above, below, or exactly 7
+                  <CardTitle className="text-2xl font-black text-gray-800">7Up 7Down</CardTitle>
+                  <CardDescription className="text-gray-700 text-base">
+                    Predict if the next number will be above 7, below 7, or exactly 7. High payouts for exact matches!
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-white/70">Payouts:</span>
-                      <span className="text-yellow-400">Up to 11.5x</span>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span className="text-gray-700 font-semibold">Live Now</span>
+                      </div>
+                      <span className="text-gray-700 font-semibold">Max: 11.5x</span>
                     </div>
                     <Button
-                      className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-black hover:from-yellow-500 hover:to-orange-600"
+                      className="w-full h-16 bg-purple-500 hover:bg-purple-600 text-white font-bold shadow-lg hover:scale-105 transition-all duration-300"
                       onClick={() => navigateToGame("7up7down")}
                       disabled={activeGame === "7up7down"}
                     >
-                      {activeGame === "7up7down" ? "Loading..." : "Play Now"}
+                      {activeGame === "7up7down" ? "Loading..." : "🎮 Play Now"}
                     </Button>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/10 dark:bg-gray-800/50 border-white/20 dark:border-gray-700 text-white dark:text-gray-200 cursor-pointer hover:bg-white/15 dark:hover:bg-gray-700/50 transition-all duration-200 hover:scale-105">
-                <CardHeader>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-purple-500 rounded-full flex items-center justify-center">
-                      <Zap className="w-6 h-6" />
+              <Card className="bg-green-100/60 border-2 border-green-200/60 text-gray-800 cursor-pointer hover:scale-105 transition-all duration-300 shadow-xl group backdrop-blur-sm">
+                <CardHeader className="pb-4">
+                  <div className="relative">
+                    <div className="w-full h-32 bg-green-100/40 rounded-lg mb-4 flex items-center justify-center">
+                      <div className="relative">
+                        <div className="w-20 h-20 bg-gradient-to-r from-purple-400 to-yellow-400 rounded-full flex items-center justify-center shadow-lg">
+                          <Zap className="w-10 h-10 text-white" />
+                        </div>
+                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-md">
+                          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <CardTitle>Spin & Win</CardTitle>
-                      <Badge className="bg-green-500 text-white text-xs">Live</Badge>
+                    <div className="absolute top-2 right-2 flex gap-2">
+                      <Badge className="bg-green-500 text-white font-bold px-2 py-1 text-xs">Up to 13.5x</Badge>
+                      <Badge className="bg-green-500 text-white font-bold px-2 py-1 text-xs">🔥 LIVE</Badge>
                     </div>
                   </div>
-                  <CardDescription className="text-white/70 dark:text-gray-300">
-                    Spin the wheel and win based on where it lands
+                  <CardTitle className="text-2xl font-black text-gray-800">Spin & Win</CardTitle>
+                  <CardDescription className="text-gray-700 text-base">
+                    Watch the wheel spin and bet on red, black, or green. Feel the excitement of every spin!
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-white/70">Payouts:</span>
-                      <span className="text-yellow-400">Up to 13.5x</span>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span className="text-gray-700 font-semibold">Live Now</span>
+                      </div>
+                      <span className="text-gray-700 font-semibold">Max: 13.5x</span>
                     </div>
                     <Button
-                      className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-black hover:from-yellow-500 hover:to-orange-600"
+                      className="w-full h-16 bg-green-500 hover:bg-green-600 text-white font-bold shadow-lg hover:scale-105 transition-all duration-300"
                       onClick={() => navigateToGame("spinwin")}
                       disabled={activeGame === "spinwin"}
                     >
-                      {activeGame === "spinwin" ? "Loading..." : "Play Now"}
+                      {activeGame === "spinwin" ? "Loading..." : "🎮 Play Now"}
                     </Button>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/10 dark:bg-gray-800/50 border-white/20 dark:border-gray-700 text-white dark:text-gray-200 cursor-pointer hover:bg-white/15 dark:hover:bg-gray-700/50 transition-all duration-200 hover:scale-105">
-                <CardHeader>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                      <Ticket className="w-6 h-6" />
+              <Card className="bg-pink-100/60 border-2 border-pink-200/60 text-gray-800 cursor-pointer hover:scale-105 transition-all duration-300 shadow-xl group backdrop-blur-sm">
+                <CardHeader className="pb-4">
+                  <div className="relative">
+                    <div className="w-full h-32 bg-pink-100/40 rounded-lg mb-4 flex items-center justify-center">
+                      <div className="relative">
+                        <div className="w-20 h-20 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full flex items-center justify-center shadow-lg">
+                          <Ticket className="w-10 h-10 text-white" />
+                        </div>
+                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-md">
+                          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <CardTitle>Lottery</CardTitle>
-                      <Badge className="bg-green-500 text-white text-xs">Live</Badge>
+                    <div className="absolute top-2 right-2 flex gap-2">
+                      <Badge className="bg-red-500 text-white font-bold px-2 py-1 text-xs">Up to 95x</Badge>
+                      <Badge className="bg-red-500 text-white font-bold px-2 py-1 text-xs">🔥 LIVE</Badge>
                     </div>
                   </div>
-                  <CardDescription className="text-white/70 dark:text-gray-300">Pick numbers from 0-99 and win big prizes</CardDescription>
+                  <CardTitle className="text-2xl font-black text-gray-800">Lottery</CardTitle>
+                  <CardDescription className="text-gray-700 text-base">
+                    Pick your lucky numbers from 0-99. Exact matches pay huge, range matches pay well!
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-white/70">Payouts:</span>
-                      <span className="text-yellow-400">Up to 95x</span>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span className="text-gray-700 font-semibold">Live Now</span>
+                      </div>
+                      <span className="text-gray-700 font-semibold">Max: 95x</span>
                     </div>
                     <Button
-                      className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-black hover:from-yellow-500 hover:to-orange-600"
+                      className="w-full h-16 bg-red-500 hover:bg-red-600 text-white font-bold shadow-lg hover:scale-105 transition-all duration-300"
                       onClick={() => navigateToGame("lottery")}
                       disabled={activeGame === "lottery"}
                     >
-                      {activeGame === "lottery" ? "Loading..." : "Play Now"}
+                      {activeGame === "lottery" ? "Loading..." : "🎮 Play Now"}
                     </Button>
                   </div>
                 </CardContent>
@@ -266,6 +357,14 @@ export function UserDashboard() {
         onClose={() => setShowReturnModal(false)}
         onSuccess={() => {}}
       />
+      </div>
+      
+      {/* Mobile Navigation (rendered at root level) - only on dashboard page */}
+      {isDashboardPage && (
+        <div className="max-[639px]:block min-[640px]:hidden">
+          <MobileNavigation />
+        </div>
+      )}
     </div>
   )
 }

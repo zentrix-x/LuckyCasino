@@ -26,6 +26,8 @@ export default function SevenUpSevenDownPage() {
   const [isPaused, setIsPaused] = useState(false)
   const [isDetailedView, setIsDetailedView] = useState(false)
   const [isPageLoading, setIsPageLoading] = useState(true)
+  const [isSpinning, setIsSpinning] = useState(false)
+  const [spinResult, setSpinResult] = useState<string | null>(null)
 
   // Use real backend data instead of mock game engine
   const canBet = currentRound?.status === "betting"
@@ -59,28 +61,53 @@ export default function SevenUpSevenDownPage() {
     }
   }, [isPaused])
 
-  // Auto-settle rounds when they're ready
+  // Auto-settle rounds when they're ready - Enhanced for immediate settlement
   useEffect(() => {
     if (currentRound?.status === "betting" && currentRound.roundEndAt) {
       const endTime = new Date(currentRound.roundEndAt)
       const now = new Date()
       
       if (now >= endTime) {
-
+        // Immediate settlement
         const settleRound = async () => {
           try {
-            await fetch("/api/games/seven_up_down/settle", { method: "POST" })
+            console.log("🔄 Auto-settling 7Up 7Down round...")
+            await fetch("/api/auto-settle", { method: "GET" })
             // Refresh current round after settling
             setTimeout(async () => {
               const res = await fetch("/api/games/seven_up_down/current-round")
               const data = await res.json()
               if (res.ok) setCurrentRound(data)
-            }, 1000)
+            }, 500) // Reduced delay for faster updates
           } catch (error) {
             console.error("Failed to settle round:", error)
           }
         }
         settleRound()
+      } else {
+        // Set up timer for immediate settlement when round ends
+        const timeUntilEnd = endTime.getTime() - now.getTime()
+        if (timeUntilEnd > 0) {
+          const timer = setTimeout(() => {
+            const settleRound = async () => {
+              try {
+                console.log("⏰ Timer triggered - settling 7Up 7Down round...")
+                await fetch("/api/auto-settle", { method: "GET" })
+                // Refresh current round after settling
+                setTimeout(async () => {
+                  const res = await fetch("/api/games/seven_up_down/current-round")
+                  const data = await res.json()
+                  if (res.ok) setCurrentRound(data)
+                }, 500)
+              } catch (error) {
+                console.error("Failed to settle round:", error)
+              }
+            }
+            settleRound()
+          }, timeUntilEnd)
+          
+          return () => clearTimeout(timer)
+        }
       }
     }
   }, [currentRound])
@@ -106,36 +133,20 @@ export default function SevenUpSevenDownPage() {
     }
   }
 
-  const handleToggleView = () => {
-    setIsDetailedView(!isDetailedView)
-    toast({
-      title: isDetailedView ? "Compact view" : "Detailed view",
-      description: `Switched to ${isDetailedView ? "compact" : "detailed"} view.`,
-    })
-  }
-
-  const handlePauseUpdates = () => {
-    setIsPaused(!isPaused)
-    toast({
-      title: isPaused ? "Updates resumed" : "Updates paused",
-      description: isPaused ? "Live updates are now active." : "Live updates are paused.",
-    })
-  }
-
-  const handlePlaceBet = async (betChoice: string) => {
-    if (!canBet || !user) {
+  const handlePlaceBet = async () => {
+    if (!user || !selectedBet || !canBet) {
       toast({
         title: "Cannot place bet",
-        description: "Betting is currently closed or you're not logged in.",
+        description: "Please select a bet type and ensure betting is open.",
         variant: "destructive",
       })
       return
     }
 
-    if (betAmount < 100 || betAmount > 1000) {
+    if (betAmount < 10 || betAmount > 10000) {
       toast({
         title: "Invalid bet amount",
-        description: "Bet must be between 100 and 1000 points.",
+        description: "Bet must be between 10 and 10,000 points.",
         variant: "destructive",
       })
       return
@@ -144,12 +155,18 @@ export default function SevenUpSevenDownPage() {
     if (user.points < betAmount) {
       toast({
         title: "Insufficient points",
-        description: "You don't have enough points for this bet.",
+        description: `You need ${betAmount} points for this bet.`,
         variant: "destructive",
       })
       return
     }
-    // Ensure we have a JWT token (dev helper)
+
+    // Start spinning animation
+    setIsSpinning(true)
+    setSpinResult(null)
+    setIsLoading(true)
+
+    // Ensure JWT token (dev helper)
     let token = jwtToken
     try {
       if (!token && user?.username) {
@@ -170,7 +187,7 @@ export default function SevenUpSevenDownPage() {
       }
     } catch {}
 
-    // Fetch current round if needed
+    // Ensure round
     if (!currentRound) {
       try {
         const roundRes = await fetch("/api/games/seven_up_down/current-round")
@@ -178,10 +195,6 @@ export default function SevenUpSevenDownPage() {
         if (roundRes.ok) setCurrentRound(roundData)
       } catch {}
     }
-
-    // Map UI betChoice to API outcome
-    const outcomeMap: Record<string, string> = { "7up": ">7", "7down": "<7", "lucky7": "=7" }
-    const outcome = outcomeMap[betChoice] || betChoice
 
     try {
       const res = await fetch("/api/bets", {
@@ -193,399 +206,457 @@ export default function SevenUpSevenDownPage() {
         body: JSON.stringify({
           gameType: "seven_up_down",
           roundId: (currentRound as any)?._id,
-          outcome,
+          outcome: selectedBet,
           amount: betAmount,
         }),
       })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err?.error || "Bet failed")
-      }
-      setSelectedBet(betChoice)
+
+      if (res.ok) {
       updatePoints(user.points - betAmount)
-      toast({
-        title: "Bet placed!",
-        description: `${betAmount} points on ${betChoice.replace(/([A-Z])/g, " $1").toLowerCase()}`,
-      })
-    } catch (e: any) {
-      console.error('Bet placement error:', e)
-      const errorMessage = e?.message || "Unable to place bet."
-      if (errorMessage.includes('forbidden')) {
         toast({ 
-          title: "Authentication Error", 
-          description: "Please log out and log back in to refresh your session.", 
-          variant: "destructive" 
+          title: "Bet placed successfully!", 
+          description: `${betAmount} points on ${selectedBet}` 
         })
-      } else {
-        toast({ title: "Bet failed", description: errorMessage, variant: "destructive" })
-      }
-    }
-  }
-
-  const getBetTypeInfo = (betType: string) => {
-    switch (betType) {
-      case "7up":
-        return {
-          label: "7 Up",
-          description: "Numbers 8-13",
-          payout: "1.95x",
-          icon: TrendingUp,
-          color: "from-red-500 to-red-600",
-        }
-      case "7down":
-        return {
-          label: "7 Down",
-          description: "Numbers 1-6",
-          payout: "1.95x",
-          icon: TrendingDown,
-          color: "from-blue-500 to-blue-600",
-        }
-      case "lucky7":
-        return {
-          label: "Lucky 7",
-          description: "Exactly 7",
-          payout: "11.5x",
-          icon: Target,
-          color: "from-yellow-500 to-orange-500",
-        }
-      default:
-        return { label: "", description: "", payout: "", icon: Target, color: "" }
-    }
-  }
-
-  useEffect(() => {
-    // Only redirect if user is explicitly null (not loading)
-    // Check if we're on client side and if localStorage has user data
-    if (typeof window !== 'undefined') {
-      const storedUser = localStorage.getItem("casino_user")
-      if (!user && !storedUser) {
-        router.replace("/")
-      }
-    }
-  }, [user, router])
-
-  // Load token and current round on mount
-  useEffect(() => {
-    // Only access localStorage on client side
-    if (typeof window !== 'undefined') {
-      try {
-        const t = localStorage.getItem("jwt")
-        if (t) setJwtToken(t)
-      } catch {}
-    }
-    
-    // Fetch current round
-    const fetchRound = async () => {
-      try {
-        const roundRes = await fetch("/api/games/seven_up_down/current-round")
-        const roundData = await roundRes.json()
-        if (roundRes.ok) setCurrentRound(roundData)
-      } catch {}
-    }
-    
-    fetchRound()
-  }, [])
-
-  // Poll current round and auto-settle when ended
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/games/seven_up_down/current-round")
-        const data = await res.json()
-        if (res.ok) {
-          setCurrentRound(data)
-          const endTs = data?.roundEndAt ? new Date(data.roundEndAt).getTime() : 0
-          const now = Date.now()
-          if (endTs && now >= endTs && data.status !== "settled") {
-            const settle = await fetch("/api/games/seven_up_down/settle", { method: "POST" })
-            const sData = await settle.json().catch(() => ({}))
-            if (settle.ok) {
-              setApiResult(sData?.winningOutcome || data?.winningOutcome || null)
+        setSelectedBet(null)
+        
+        // Continue spinning for 3 seconds, then show result
+        setTimeout(async () => {
+          try {
+            // Fetch the latest result
+            const res = await fetch("/api/games/seven_up_down/current-round")
+            const data = await res.json()
+            if (res.ok && data.winningOutcome) {
+              console.log("🎯 Backend result:", data.winningOutcome)
+              setSpinResult(data.winningOutcome)
+              setApiResult(data.winningOutcome)
+            } else {
+              // Generate random result if none provided
+              const results = ["<7", "=7", ">7"]
+              const randomResult = results[Math.floor(Math.random() * results.length)]
+              console.log("🎲 Generated random result:", randomResult)
+              setSpinResult(randomResult)
+              setApiResult(randomResult)
             }
-          } else if (data?.status === "settled") {
-            setApiResult(data?.winningOutcome || null)
+          } catch (error) {
+            console.error("Failed to fetch result:", error)
+            // Fallback to random result for demo
+            const results = ["<7", "=7", ">7"]
+            const randomResult = results[Math.floor(Math.random() * results.length)]
+            console.log("🎲 Error fallback - generated random result:", randomResult)
+            setSpinResult(randomResult)
+            setApiResult(randomResult)
+          } finally {
+            setIsSpinning(false)
+            setIsLoading(false)
           }
-        }
-      } catch {}
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [])
+        }, 3000)
+      } else {
+        const errorData = await res.json()
+        const errorMessage = errorData?.message || "Unable to place bet."
+        toast({
+          title: "Bet failed",
+          description: errorMessage,
+          variant: "destructive",
+        })
+        setIsSpinning(false)
+        setIsLoading(false)
+      }
+    } catch (error) {
+      console.error("Bet placement error:", error)
+      const errorMessage = error?.message || "Unable to place bet."
+      toast({
+        title: "Bet failed",
+        description: errorMessage,
+        variant: "destructive",
+      })
+      setIsSpinning(false)
+      setIsLoading(false)
+    }
+  }
 
-  // Removed SSE updates - using polling instead
+  const getBetColor = (betType: string) => {
+    switch (betType) {
+      case "up":
+        return "from-green-500 to-emerald-600"
+      case "down":
+        return "from-red-500 to-pink-600"
+      case "seven":
+        return "from-yellow-500 to-orange-600"
+      default:
+        return "from-gray-500 to-gray-600"
+    }
+  }
 
-  if (!user) return null
+  const getBetIcon = (betType: string) => {
+    switch (betType) {
+      case "up":
+        return "📈"
+      case "down":
+        return "📉"
+      case "seven":
+        return "🎯"
+      default:
+        return "❓"
+    }
+  }
 
-  // Show loading screen while page is loading
-  if (isPageLoading) {
+  const getBetLabel = (betType: string) => {
+    switch (betType) {
+      case "up":
+        return "7 Up (8-15)"
+      case "down":
+        return "7 Down (1-6)"
+      case "seven":
+        return "Exactly 7"
+      default:
+        return "Unknown"
+    }
+  }
+
+  const getBetMultiplier = (betType: string) => {
+    switch (betType) {
+      case "up":
+        return "2x"
+      case "down":
+        return "2x"
+      case "seven":
+        return "11.5x"
+      default:
+        return "1x"
+    }
+  }
+
+  const calculatePayout = (betType: string, result: string) => {
+    let isWin = false
+    let multiplier = 1
+
+    switch (betType) {
+      case "up":
+        isWin = result === ">7"
+        multiplier = 2
+        break
+      case "down":
+        isWin = result === "<7"
+        multiplier = 2
+        break
+      case "seven":
+        isWin = result === "=7"
+        multiplier = 11.5
+        break
+    }
+
+    return {
+      isWin,
+      payout: isWin ? betAmount * multiplier : 0,
+      profitLoss: isWin ? (betAmount * multiplier) - betAmount : -betAmount
+    }
+  }
+
+  if (isNavigating) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-red-500 via-purple-600 to-blue-500 rounded-xl shadow-lg shadow-purple-500/30 flex items-center justify-center mx-auto mb-4 animate-pulse">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-white rounded-full opacity-80"></div>
-              <span className="text-white font-black text-sm">7</span>
-              <div className="w-2 h-2 bg-white rounded-full opacity-80"></div>
-            </div>
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Loading 7Up 7Down...</h2>
-          <p className="text-white/60">Preparing your game experience</p>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
+          <p className="mt-4 text-white">Loading...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-      {/* Header */}
-      <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex flex-col sm:flex-row gap-2 sm:gap-0 sm:items-center justify-between">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => {
-                if (isNavigating) return
-                setIsNavigating(true)
-                // Try to go back in history first, fallback to dashboard
-                if (window.history.length > 1) {
-                  router.back()
-                } else {
-                  router.replace("/")
-                }
-                // Reset navigation state after a short delay
-                setTimeout(() => setIsNavigating(false), 1000)
-              }} 
-              disabled={isNavigating}
-              className="text-white hover:bg-white/10"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              {isNavigating ? "Loading..." : "Back to Dashboard"}
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                {/* Modern gradient background with glow */}
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-red-500 via-purple-600 to-blue-500 rounded-xl shadow-lg shadow-purple-500/30 flex items-center justify-center relative overflow-hidden">
-                  {/* Animated gradient overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
-                  
-                  {/* Modern 7Up 7Down icon */}
-                  <div className="relative z-10 flex items-center justify-center">
-                    <div className="flex items-center gap-1">
-                      {/* Down arrow */}
-                      <div className="w-2 h-2 bg-white rounded-full opacity-80"></div>
-                      {/* Center 7 */}
-                      <span className="text-white font-black text-xs sm:text-sm drop-shadow-lg">7</span>
-                      {/* Up arrow */}
-                      <div className="w-2 h-2 bg-white rounded-full opacity-80"></div>
-                    </div>
-                  </div>
-                  
-                  {/* Corner accent */}
-                  <div className="absolute top-0 right-0 w-2 h-2 sm:w-3 sm:h-3 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-bl-lg"></div>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Casino Background Image */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: 'url(/images/backgrounds/7up7down.jpg)',
+          filter: 'brightness(0.6) contrast(1.3)'
+        }}
+      ></div>
+      
+      {/* Enhanced overlay for better image visibility */}
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/60 via-blue-900/50 to-indigo-900/60"></div>
+      
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Floating casino chips */}
+        <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-br from-red-500/20 to-red-600/20 rounded-full animate-bounce casino-glow"></div>
+        <div className="absolute top-40 right-20 w-24 h-24 bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-full animate-bounce" style={{ animationDelay: "1s" }}></div>
+        <div className="absolute bottom-40 left-1/4 w-20 h-20 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-full animate-bounce casino-glow" style={{ animationDelay: "2s" }}></div>
+        <div className="absolute top-1/2 right-1/4 w-16 h-16 bg-gradient-to-br from-yellow-500/20 to-yellow-600/20 rounded-full animate-bounce" style={{ animationDelay: "3s" }}></div>
+        
+        {/* Sparkling effects */}
+        <div className="absolute top-1/3 left-1/3 w-2 h-2 bg-yellow-400 rounded-full animate-ping" style={{ animationDelay: "0.5s" }}></div>
+        <div className="absolute top-2/3 right-1/3 w-3 h-3 bg-blue-400 rounded-full animate-ping" style={{ animationDelay: "1.5s" }}></div>
+        <div className="absolute bottom-1/3 left-2/3 w-2 h-2 bg-green-400 rounded-full animate-ping" style={{ animationDelay: "2.5s" }}></div>
+        
+        {/* Glowing orbs */}
+        <div className="absolute top-1/4 right-1/4 w-40 h-40 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-full blur-xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-full blur-xl animate-pulse" style={{ animationDelay: "2s" }}></div>
                 </div>
                 
-                {/* Outer glow ring */}
-                <div className="absolute inset-0 w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-red-500/30 via-purple-500/30 to-blue-500/30 rounded-xl blur-sm animate-pulse"></div>
+      {/* Enhanced Header */}
+      <header className="border-b border-yellow-400/30 bg-black/60 backdrop-blur-xl relative z-10 shadow-2xl">
+        <div className="container mx-auto px-4 py-4 sm:py-6 flex flex-col sm:flex-row gap-3 sm:gap-4 items-center justify-center sm:justify-between">
+          <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto justify-center sm:justify-start mx-auto sm:mx-0">
+            <button
+              onClick={() => router.push("/")}
+              className="p-2 rounded-lg bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black transition-all duration-300 shadow-lg hover:scale-105"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="relative">
+              <div className="w-10 h-10 sm:w-14 sm:h-14 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center casino-glow shadow-lg animate-pulse">
+                <span className="text-black font-bold text-xl sm:text-2xl">🎯</span>
               </div>
-              
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black text-white drop-shadow-lg">7Up 7Down</h1>
-                <p className="text-[10px] sm:text-xs text-white/60 font-medium">Live Casino Game</p>
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-ping"></div>
               </div>
+            <div className="text-center sm:text-left">
+              <h1 className="text-3xl xs:text-4xl sm:text-5xl font-serif font-bold text-white leading-tight">
+                <span className="bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">7Up 7Down</span>
+              </h1>
+              <p className="text-yellow-400 text-xs sm:text-sm font-semibold">🎯 VIP Casino Experience</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="text-white">
-              <span className="text-xs sm:text-sm opacity-80">Points: </span>
-              <span className="font-bold text-base sm:text-lg">{user.points.toLocaleString()}</span>
+          <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
+            <div className="text-center sm:text-right">
+              <p className="text-white text-sm font-medium">💰 Balance</p>
+              <p className="text-yellow-400 text-lg sm:text-xl font-bold casino-glow">
+                {user?.points?.toLocaleString() || "0"} points
+              </p>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 mobile-spacing">
-        <div className="grid lg:grid-cols-3 gap-4 sm:gap-8">
-          {/* Main Game Area */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Game Status */}
+      <main className="relative z-10 text-white">
+        <div className="container mx-auto px-4 py-8 flex justify-center">
+          <div className="max-w-4xl w-full">
+            {/* Game Status Bar */}
             <GameStatusBar 
-              gameType="7up7down" 
-              currentRound={currentRound || null}
+              currentRound={currentRound}
               onRefresh={handleRefresh}
-              onToggleView={handleToggleView}
-              onPauseUpdates={handlePauseUpdates}
+              onPause={() => setIsPaused(!isPaused)}
+              isPaused={isPaused}
+              isDetailedView={isDetailedView}
+              onToggleView={() => setIsDetailedView(!isDetailedView)}
             />
 
-            {/* Game Board */}
-            <Card className="bg-white/10 border-white/20 text-white">
-              <CardHeader>
-                <CardTitle className="text-center text-xl sm:text-2xl">Choose Your Prediction</CardTitle>
-                <p className="text-center text-white/70 text-sm">Predict where the next number (1-13) will fall</p>
+            {/* Main Game Card */}
+            <Card className="relative overflow-hidden bg-gradient-to-br from-purple-900/40 to-blue-900/40 border-2 border-purple-500/30 backdrop-blur-sm shadow-2xl">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-blue-500/10"></div>
+              <CardHeader className="relative">
+                <CardTitle className="text-2xl sm:text-3xl font-serif text-white text-center">
+                  🎯 <span className="bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">7Up 7Down</span> - VIP Casino Game
+                </CardTitle>
+                <p className="text-white/80 text-center text-sm sm:text-base">
+                  🎲 Predict if the next number will be above 7, below 7, or exactly 7. High payouts for exact matches!
+                </p>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="relative space-y-6">
                 {/* Modern Betting Options */}
-                <div className="grid md:grid-cols-3 gap-3 sm:gap-6 px-2 sm:px-4">
-                  {[
-                    { betType: "7down", label: "7 Down", gradient: "from-blue-500 via-blue-600 to-blue-700", glow: "shadow-blue-500/30", payout: "1.95x", description: "Numbers 1-6", icon: "🔽" },
-                    { betType: "lucky7", label: "Lucky 7", gradient: "from-orange-500 via-orange-600 to-orange-700", glow: "shadow-orange-500/30", payout: "11.5x", description: "Exactly 7", icon: "🎯" },
-                    { betType: "7up", label: "7 Up", gradient: "from-red-500 via-red-600 to-red-700", glow: "shadow-red-500/30", payout: "1.95x", description: "Numbers 8-13", icon: "🔼" }
-                  ].map((betOption) => {
-                    const isSelected = selectedBet === betOption.betType
-                    const isDisabled = !canBet
-
-                    return (
-                      <Card
-                        key={betOption.betType}
-                        className={`cursor-pointer transition-all duration-300 transform hover:scale-105 ${
-                          isSelected 
-                            ? "ring-2 ring-yellow-400 bg-white/20 shadow-lg shadow-yellow-400/20" 
-                            : "bg-white/5 hover:bg-white/10 hover:shadow-lg"
-                        } ${isDisabled ? "opacity-50 cursor-not-allowed" : ""} border-white/20 backdrop-blur-sm`}
-                        onClick={() => !isDisabled && handlePlaceBet(betOption.betType)}
+                <div className="max-w-3xl mx-auto">
+                  <h3 className="text-lg sm:text-xl font-semibold text-white mb-4 text-center">
+                    🎯 Choose Your Bet Type
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {[
+                      { type: "up", label: "7 Up (8-15)", icon: "📈", color: "from-green-500 to-emerald-600", multiplier: "2x" },
+                      { type: "down", label: "7 Down (1-6)", icon: "📉", color: "from-red-500 to-pink-600", multiplier: "2x" },
+                      { type: "seven", label: "Exactly 7", icon: "🎯", color: "from-yellow-500 to-orange-600", multiplier: "11.5x" }
+                    ].map((bet) => (
+                      <button
+                        key={bet.type}
+                        onClick={() => setSelectedBet(bet.type)}
+                        disabled={!canBet || isLoading || isSpinning}
+                        className={`relative overflow-hidden p-6 rounded-xl border-2 transition-all duration-300 transform hover:scale-105 ${
+                          selectedBet === bet.type
+                            ? `bg-gradient-to-r ${bet.color} border-white shadow-2xl`
+                            : "bg-gradient-to-br from-gray-800/40 to-gray-900/40 border-gray-600/30 hover:border-gray-500/50 hover:bg-gray-700/40"
+                        } ${!canBet || isLoading || isSpinning ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                       >
-                        <CardContent className="p-3 sm:p-5 text-center relative overflow-hidden">
-                          {/* Background glow effect */}
-                          <div className={`absolute inset-0 bg-gradient-to-br ${betOption.gradient} opacity-10 rounded-lg ${isSelected ? 'animate-pulse' : ''}`}></div>
-                          
-                          {/* Modern betting circle */}
-                          <div className={`w-10 h-10 sm:w-14 sm:h-14 mx-auto mb-2 sm:mb-4 rounded-full bg-gradient-to-br ${betOption.gradient} flex items-center justify-center ${betOption.glow} shadow-lg relative z-10`}>
-                            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-white/20 to-transparent flex items-center justify-center">
-                              <span className="text-white text-xs sm:text-base font-black drop-shadow-lg">{betOption.icon}</span>
+                        <div className="text-center space-y-3">
+                          <div className={`text-4xl sm:text-5xl ${selectedBet === bet.type ? "animate-bounce" : ""}`}>
+                            {bet.icon}
                             </div>
+                          <div>
+                            <h4 className="font-bold text-lg sm:text-xl text-white">
+                              {bet.label}
+                            </h4>
+                            <p className="text-sm text-white/80">
+                              Payout: <span className="font-bold text-yellow-400">{bet.multiplier}</span>
+                            </p>
                           </div>
-                          
-                          <h3 className="text-sm sm:text-base font-bold text-white mb-1 sm:mb-2 relative z-10">{betOption.label}</h3>
-                          <p className="text-xs text-white/70 mb-1 sm:mb-2 relative z-10">{betOption.description}</p>
-                          
-                          <Badge className={`bg-gradient-to-r ${betOption.gradient} text-white text-[10px] sm:text-xs font-bold px-2 py-0.5 sm:px-3 sm:py-1 relative z-10 shadow-lg`}>
-                            Pays {betOption.payout}
-                          </Badge>
-                          
-                          {/* Selection indicator */}
-                          {isSelected && (
-                            <div className="absolute top-2 right-2 w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
+                          {selectedBet === bet.type && (
+                            <div className="absolute top-2 right-2">
+                              <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center">
+                                <span className="text-black text-xs font-bold">✓</span>
+                              </div>
+                            </div>
                           )}
-                        </CardContent>
-                      </Card>
-                    )
-                  })}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Modern Bet Amount Section */}
-                <div className="max-w-md mx-auto px-2 sm:px-4">
-                  <label className="block text-white text-sm font-bold mb-2 sm:mb-3 text-center">🎯 Bet Amount (min: 100 points)</label>
-                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        min="100"
-
-                        value={betAmount}
-                        onChange={(e) => setBetAmount(Number(e.target.value))}
-                        className="bg-white/10 border-white/30 text-white placeholder-white/50 backdrop-blur-sm focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400/50 transition-all duration-300"
-                        disabled={!canBet}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-md"></div>
-                    </div>
-                    <div className="flex gap-2 justify-center sm:justify-start">
-                      {[100, 250, 500, 1000].map((amount) => (
-                        <Button
+                <div className="flex flex-col items-center">
+                  <h3 className="text-lg sm:text-xl font-semibold text-white mb-4 text-center">
+                    💰 Set Your Bet Amount
+                  </h3>
+                  <div className="flex flex-col sm:flex-row gap-4 items-center">
+                    <div className="flex gap-2">
+                      {[100, 500, 1000, 5000].map((amount) => (
+                        <button
                           key={amount}
-                          variant="outline"
-                          size="sm"
                           onClick={() => setBetAmount(amount)}
-                          disabled={!canBet}
-                          className="border-white/30 text-white hover:bg-white/15 hover:border-yellow-400/50 hover:shadow-lg hover:shadow-yellow-400/20 text-xs sm:text-sm font-bold transition-all duration-300 transform hover:scale-105 backdrop-blur-sm"
+                          disabled={isLoading || isSpinning}
+                          className={`px-4 py-2 rounded-lg border-2 transition-all duration-200 ${
+                            betAmount === amount
+                              ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-black border-yellow-400 shadow-lg"
+                              : "bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-yellow-400/50"
+                          } ${isLoading || isSpinning ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                         >
                           {amount}
-                        </Button>
+                        </button>
                       ))}
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        value={betAmount}
+                        onChange={(e) => setBetAmount(Number(e.target.value))}
+                        min={10}
+                        max={10000}
+                        disabled={isLoading || isSpinning}
+                        className="w-32 bg-white/10 border-white/20 text-white placeholder-white/50 text-center focus:border-yellow-400/50 focus:ring-yellow-400/20"
+                        placeholder="Custom"
+                      />
+                      <span className="text-white/80 text-sm">points</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Current Result Display */}
-                {currentRound?.status === "settled" && currentRound.winningOutcome && (
-                  <div className="text-center py-6 sm:py-8">
-                    <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 text-black text-3xl sm:text-4xl font-bold mb-3 sm:mb-4">
-                      {currentRound.winningOutcome}
+                {/* Place Bet Button */}
+                {selectedBet && (
+                  <div className="text-center">
+                    <button
+                      onClick={handlePlaceBet}
+                      disabled={!canBet || isLoading || isSpinning}
+                      className={`px-8 py-4 rounded-xl font-bold text-lg sm:text-xl transition-all duration-300 transform hover:scale-105 shadow-2xl ${
+                        canBet && !isLoading && !isSpinning
+                          ? "bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black casino-glow"
+                          : "bg-gray-600 text-gray-300 cursor-not-allowed"
+                      }`}
+                    >
+                      {isLoading ? (
+                        "Placing Bet..."
+                      ) : isSpinning ? (
+                        "Spinning..."
+                      ) : (
+                        `🎯 Place Bet - ${betAmount} points on ${getBetLabel(selectedBet)}`
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Spinning Animation */}
+                {isSpinning && (
+                  <div className="text-center py-8">
+                    <div className="relative">
+                      {/* Casino chips around the spinning wheel */}
+                      <div className="absolute -top-4 -left-4 w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 rounded-full border-2 border-white/20 animate-bounce"></div>
+                      <div className="absolute -top-4 -right-4 w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full border-2 border-white/20 animate-bounce" style={{ animationDelay: '0.5s' }}></div>
+                      <div className="absolute -bottom-4 -left-4 w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-full border-2 border-white/20 animate-bounce" style={{ animationDelay: '1s' }}></div>
+                      <div className="absolute -bottom-4 -right-4 w-8 h-8 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-full border-2 border-white/20 animate-bounce" style={{ animationDelay: '1.5s' }}></div>
+                      
+                      <div 
+                        className="inline-flex items-center justify-center w-32 h-32 rounded-full bg-gradient-to-r from-purple-500 via-pink-600 to-orange-500 text-white text-4xl font-bold mb-4 animate-spin shadow-2xl"
+                        style={{ animationDuration: '1s' }}
+                      >
+                        🎯
+                      </div>
                     </div>
                     <div className="text-white">
-                      <p className="text-base sm:text-lg font-semibold mb-2">
-                        Result: {currentRound.winningOutcome === "=7" ? "Lucky 7!" : currentRound.winningOutcome === ">7" ? "7 Up" : "7 Down"}
-                      </p>
+                      <p className="text-xl font-semibold mb-2">🎯 Rolling the Dice! 🎯</p>
+                      <p className="text-base text-white/70 mb-4">💰 Good luck! 💰</p>
                     </div>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </div>
 
-          {/* Sidebar */}
-          <div className="space-y-4 sm:space-y-6">
-            {/* Game History */}
-            <GameHistoryPanel gameType="seven_up_down" />
-
-            {/* Your Recent Bets */}
-            <Card className="bg-white/10 border-white/20 text-white">
-              <CardHeader>
-                <CardTitle className="text-base sm:text-lg">Your Recent Bets</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {recentUserBets.length === 0 ? (
-                  <p className="text-white/60 text-sm">No bets placed yet</p>
-                ) : (
-                  <div className="space-y-3">
-                    {recentUserBets.map((bet) => (
-                      <div key={bet.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                        <div>
-                          <p className="text-sm font-medium">{getBetTypeInfo(bet.betChoice).label}</p>
-                          <p className="text-xs text-white/60">{bet.betAmount} points</p>
+                {/* Current Result Display */}
+                {(spinResult !== null && !isSpinning) && (
+                  <div className="text-center py-8">
+                    <div className="relative">
+                      {/* Casino celebration elements */}
+                      <div className="absolute -top-2 -left-2 text-2xl animate-bounce">🎉</div>
+                      <div className="absolute -top-2 -right-2 text-2xl animate-bounce" style={{ animationDelay: '0.3s' }}>🎊</div>
+                      <div className="absolute -bottom-2 -left-2 text-2xl animate-bounce" style={{ animationDelay: '0.6s' }}>💎</div>
+                      <div className="absolute -bottom-2 -right-2 text-2xl animate-bounce" style={{ animationDelay: '0.9s' }}>💰</div>
+                      
+                      <div
+                        className={`inline-flex items-center justify-center w-32 h-32 rounded-full bg-gradient-to-r ${
+                          spinResult === "=7" ? "from-yellow-500 to-orange-600" : 
+                          spinResult === ">7" ? "from-green-500 to-emerald-600" : "from-red-500 to-pink-600"
+                        } text-white text-4xl font-bold mb-4 shadow-2xl border-4 border-yellow-400/50`}
+                      >
+                        {spinResult === "=7" ? "7" : spinResult === ">7" ? "8-15" : "1-6"}
+                      </div>
+                    </div>
+                    <div className="text-white">
+                      <p className="text-xl font-semibold mb-2">🎯 Result: {spinResult} 🎯</p>
+                      <p className="text-base text-white/70 mb-4">
+                        {spinResult === "=7" ? "🎯 Exactly 7!" : 
+                         spinResult === ">7" ? "📈 Above 7" : "📉 Below 7"}
+                      </p>
+                      {/* Show bet result */}
+                      {selectedBet && (
+                        <div className="mt-4 p-4 bg-white/10 rounded-lg border border-yellow-400/20">
+                          <p className="text-lg font-semibold mb-2">💰 Your Bet Result: 💰</p>
+                          {(() => {
+                            const result = calculatePayout(selectedBet, spinResult)
+                            return (
+                              <div className="flex items-center justify-between p-2 bg-white/5 rounded">
+                                <span>🎯 {getBetLabel(selectedBet)}:</span>
+                                <span className={`font-bold ${result.isWin ? 'text-green-400' : 'text-red-400'}`}>
+                                  {result.isWin ? '🎉 +' : '💔 '}{result.profitLoss.toLocaleString()} points
+                                </span>
+                              </div>
+                            )
+                          })()}
                         </div>
-                        <div className="text-right">
-                          {bet.result ? (
-                            <Badge className={bet.result === "win" ? "bg-green-500" : "bg-red-500"}>
-                              {bet.result === "win" ? `+${bet.payout}` : `-${bet.betAmount}`}
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-yellow-500">Pending</Badge>
                           )}
                         </div>
-                      </div>
-                    ))}
                   </div>
                 )}
-              </CardContent>
-            </Card>
 
             {/* Game Rules */}
-            <Card className="bg-white/10 border-white/20 text-white">
-              <CardHeader>
-                <CardTitle className="text-base sm:text-lg">How to Play</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
-                <div>
-                  <p className="font-semibold text-blue-400">7 Down (1-6)</p>
-                  <p className="text-white/70">Pays 1.95x your bet</p>
+                <div className="mt-8 p-6 bg-white/5 rounded-xl border border-white/10">
+                  <h3 className="text-lg font-semibold text-white mb-4 text-center">📋 Game Rules</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                    <div className="text-center p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                      <div className="text-2xl mb-2">📈</div>
+                      <p className="font-semibold text-green-400">7 Up (8-15)</p>
+                      <p className="text-white/80">Payout: 2x</p>
+                    </div>
+                    <div className="text-center p-3 bg-red-500/10 rounded-lg border border-red-500/20">
+                      <div className="text-2xl mb-2">📉</div>
+                      <p className="font-semibold text-red-400">7 Down (1-6)</p>
+                      <p className="text-white/80">Payout: 2x</p>
                 </div>
-                <div>
-                  <p className="font-semibold text-red-400">7 Up (8-13)</p>
-                  <p className="text-white/70">Pays 1.95x your bet</p>
+                    <div className="text-center p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                      <div className="text-2xl mb-2">🎯</div>
+                      <p className="font-semibold text-yellow-400">Exactly 7</p>
+                      <p className="text-white/80">Payout: 11.5x</p>
                 </div>
-                <div>
-                  <p className="font-semibold text-yellow-400">Lucky 7</p>
-                  <p className="text-white/70">Pays 11.5x your bet</p>
                 </div>
-                <div className="pt-2 border-t border-white/20">
-                  <p className="text-xs text-white/60">
-                    A random number from 1-13 is drawn each round. Place your bet before the countdown ends!
-                  </p>
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

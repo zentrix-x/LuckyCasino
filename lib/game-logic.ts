@@ -18,21 +18,30 @@ export interface GameResult {
 export class GameLogicService {
   /**
    * Calculate the winning outcome for 7Up 7Down
-   * Strategy: Choose outcome with lowest potential payout
+   * Strategy: Random selection with house edge consideration
    */
   static calculate7Up7DownResult(bets: BetSummary[]): GameResult {
     const outcomes = ['<7', '=7', '>7']
-    let bestOutcome = '<7'
-    let lowestPayout = Infinity
+    const totalInvestment = bets.reduce((sum, bet) => sum + bet.totalAmount, 0)
+    const targetPayout = totalInvestment * 0.85 // House keeps 15%
 
-    for (const outcome of outcomes) {
-      const bet = bets.find(b => b.outcome === outcome)
-      const payout = bet ? bet.potentialPayout : 0
-      
-      if (payout < lowestPayout) {
-        lowestPayout = payout
-        bestOutcome = outcome
-      }
+    // Find all outcomes that pay ≤85% of total investment
+    const qualifyingOutcomes = bets.filter(bet => bet.potentialPayout <= targetPayout)
+
+    let bestOutcome: string
+
+    if (qualifyingOutcomes.length > 0) {
+      // Choose randomly from qualifying outcomes for more variety
+      const randomIndex = Math.floor(Math.random() * qualifyingOutcomes.length)
+      bestOutcome = qualifyingOutcomes[randomIndex].outcome
+    } else if (bets.length > 0) {
+      // If no outcome qualifies, choose randomly from all outcomes
+      const randomIndex = Math.floor(Math.random() * outcomes.length)
+      bestOutcome = outcomes[randomIndex]
+    } else {
+      // If no bets at all, choose randomly from all outcomes
+      const randomIndex = Math.floor(Math.random() * outcomes.length)
+      bestOutcome = outcomes[randomIndex]
     }
 
     const winningBet = bets.find(b => b.outcome === bestOutcome)
@@ -51,37 +60,39 @@ export class GameLogicService {
 
   /**
    * Calculate the winning outcome for Spin & Win
-   * Strategy: Choose outcome that pays ≤85% of total investment
-   * Priority: If multiple outcomes qualify, choose the one closest to 85%
+   * Strategy: Random selection with house edge consideration
    */
   static calculateSpinWinResult(bets: BetSummary[]): GameResult {
     const totalInvestment = bets.reduce((sum, bet) => sum + bet.totalAmount, 0)
     const targetPayout = totalInvestment * 0.85
 
+    // All possible outcomes for Spin & Win
+    const allOutcomes = ['x2', 'x7', 'x3', 'x6', 'x4', 'x5']
+
     // Find all outcomes that pay ≤85%
     const qualifyingOutcomes = bets.filter(bet => bet.potentialPayout <= targetPayout)
 
-    let bestOutcome = 'x2'
-    let closestToTarget = Infinity
+    let bestOutcome: string
 
     if (qualifyingOutcomes.length > 0) {
-      // Choose the one closest to 85% target
-      for (const bet of qualifyingOutcomes) {
-        const difference = Math.abs(targetPayout - bet.potentialPayout)
-        if (difference < closestToTarget) {
-          closestToTarget = difference
-          bestOutcome = bet.outcome
-        }
-      }
+      // Choose randomly from qualifying outcomes for more variety
+      const randomIndex = Math.floor(Math.random() * qualifyingOutcomes.length)
+      bestOutcome = qualifyingOutcomes[randomIndex].outcome
+    } else if (bets.length > 0) {
+      // If no outcome qualifies, choose randomly from all outcomes
+      const randomIndex = Math.floor(Math.random() * allOutcomes.length)
+      bestOutcome = allOutcomes[randomIndex]
     } else {
-      // If no outcome qualifies, choose the one with lowest payout
-      let lowestPayout = Infinity
-      for (const bet of bets) {
-        if (bet.potentialPayout < lowestPayout) {
-          lowestPayout = bet.potentialPayout
-          bestOutcome = bet.outcome
-        }
-      }
+      // If no bets at all, choose randomly from all outcomes
+      const randomIndex = Math.floor(Math.random() * allOutcomes.length)
+      bestOutcome = allOutcomes[randomIndex]
+    }
+
+    // Add extra randomness to prevent predictable patterns
+    const extraRandom = Math.random()
+    if (extraRandom < 0.1) { // 10% chance to override with completely random outcome
+      const randomIndex = Math.floor(Math.random() * allOutcomes.length)
+      bestOutcome = allOutcomes[randomIndex]
     }
 
     const winningBet = bets.find(b => b.outcome === bestOutcome)
